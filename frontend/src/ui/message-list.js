@@ -1,12 +1,13 @@
 import { state, on, off } from '../lib/state.js';
 import { formatTime, formatDate } from '../lib/utils.js';
 import { api } from '../lib/api.js';
+import { decryptMessage, importPublicKey } from '../lib/crypto.js';
 
 export function renderMessageList(convId, isGroup) {
   const container = document.createElement('div');
   container.className = 'message-list';
 
-  function render() {
+  async function render() {
     const msgs = (state.messages[convId] || []).slice().reverse();
     container.innerHTML = '';
     if (!msgs.length) {
@@ -14,8 +15,19 @@ export function renderMessageList(convId, isGroup) {
       return;
     }
 
+    // Получаем публичный ключ собеседника для расшифровки
+    const conv = state.conversations.find(c => c.id === convId);
+    const other = conv?.members?.find(m => m.id !== state.user?.id);
+    let theirPublicKey = null;
+    if (!isGroup && other?.public_key && state.myKeyPair) {
+      try { theirPublicKey = await importPublicKey(other.public_key); } catch {}
+    }
+
+    // Расшифровываем сообщения
+    const decrypted = await Promise.all(msgs.map(msg => decryptMsg(msg, theirPublicKey)));
+
     let lastDate = null;
-    for (const msg of msgs) {
+    for (const msg of decrypted) {
       const dateLabel = formatDate(msg.created_at);
       if (dateLabel !== lastDate) {
         lastDate = dateLabel;
@@ -37,6 +49,16 @@ export function renderMessageList(convId, isGroup) {
   return container;
 }
 
+async function decryptMsg(msg, theirPublicKey) {
+  if (msg._decrypted) return msg;
+  if (!msg.nonce || !theirPublicKey || !state.myKeyPair) return msg;
+
+  // Определяем чей ключ использовать: если я отправитель — расшифровываем своим ключом от их публичного
+  // Если они отправитель — расшифровываем своим от их публичного (симметрично)
+  const content = await decryptMessage(msg.content, msg.nonce, state.myKeyPair.privateKey, theirPublicKey);
+  return { ...msg, content, _decrypted: true };
+}
+
 function renderMessage(msg, isGroup) {
   const isOwn = msg.sender_id === state.user?.id;
   const wrap = document.createElement('div');
@@ -52,37 +74,25 @@ function renderMessage(msg, isGroup) {
 
   const bubble = document.createElement('div');
   bubble.className = `message-bubble ${isOwn ? 'own' : 'other'}${msg.status === 'pending' ? ' pending' : ''}${msg.status === 'failed' ? ' failed' : ''}`;
-  bubble.textContent = msg.content;
-  wrap.appendChild(bubble);
 
-  const time = document.createElement('div');
-  time.className = 'message-time';
-  time.textContent = formatTime(msg.created_at);
-  wrap.appendChild(time);
-
-  if (msg.status === 'failed') {
-    const retry = document.createElement('div');
-    retry.className = 'message-retry';
-    retry.textContent = 'Failed. Tap to retry';
-    retry.addEventListener('click', () => retryMessage(msg));
-    wrap.appendChild(retry);
+  // Если зашифровано но не расшифровалось — показываем замок
+  if (msg.nonce && !msg._decrypted) {
+    bubble.innerHTML = `<span style="color:var(--text-2)">🔒 encrypted</span>`;
+  } else {
+    bubble.textContent = msg.content;
   }
 
-  // Пометить как прочитанное
+  wrap.appendChild(bubble);
+
+  // Иконка замка для E2E сообщений
+  const meta = document.createElement('div');
+  meta.className = 'message-time';
+  meta.textContent = formatTime(msg.created_at) + (msg.nonce ? ' 🔒' : '');
+  wrap.appendChild(meta);
+
   if (!isOwn && msg.id && !msg.id.startsWith('tmp_')) {
     api.post(`/messages/${msg.id}/read`).catch(() => {});
   }
 
   return wrap;
-}
-
-async function retryMessage(failedMsg) {
-  const convId = failedMsg.conversation_id;
-  const msgs = state.messages[convId] || [];
-  // Убираем failed сообщение
-  state.messages = {
-    ...state.messages,
-    [convId]: msgs.filter(m => m.id !== failedMsg.id),
-  };
-  // Повторная отправка через composer — пока просто удаляем
 }

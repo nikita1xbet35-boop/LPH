@@ -19,8 +19,8 @@ export async function handleConversations(request: Request, env: Env, path: stri
 
       const enriched = await Promise.all(convs.map(async (conv) => {
         const { results: members } = await env.DB.prepare(
-          'SELECT u.id, u.username, u.display_name, u.last_seen FROM users u JOIN conversation_members cm ON cm.user_id = u.id WHERE cm.conversation_id = ?'
-        ).bind(conv.id).all<Pick<User, 'id' | 'username' | 'display_name' | 'last_seen'>>();
+          'SELECT u.id, u.username, u.display_name, u.last_seen, u.public_key FROM users u JOIN conversation_members cm ON cm.user_id = u.id WHERE cm.conversation_id = ?'
+        ).bind(conv.id).all<Pick<User, 'id' | 'username' | 'display_name' | 'last_seen' | 'public_key'>>();
 
         const lastMsg = await env.DB.prepare(
           'SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at DESC LIMIT 1'

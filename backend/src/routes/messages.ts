@@ -17,14 +17,14 @@ export async function handleMessages(request: Request, env: Env, path: string): 
       ).bind(convId, ctx.user.id).first();
       if (!member) return err('forbidden', 'Not a member', 403, env, request);
 
-      let body: { content?: string };
+      let body: { content?: string; nonce?: string };
       try { body = await request.json(); } catch { return err('bad_request', 'Invalid JSON', 400, env, request); }
       if (!body.content?.trim()) return err('bad_request', 'content required', 400, env, request);
 
       const msgId = nanoid();
       await env.DB.prepare(
-        'INSERT INTO messages (id, conversation_id, sender_id, content, created_at) VALUES (?, ?, ?, ?, ?)'
-      ).bind(msgId, convId, ctx.user.id, body.content, now).run();
+        'INSERT INTO messages (id, conversation_id, sender_id, content, nonce, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+      ).bind(msgId, convId, ctx.user.id, body.content, body.nonce ?? null, now).run();
 
       const message = await env.DB.prepare('SELECT * FROM messages WHERE id = ?').bind(msgId).first<Message>();
 

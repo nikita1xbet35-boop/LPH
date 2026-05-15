@@ -1,6 +1,7 @@
 import { api } from '../lib/api.js';
 import { state } from '../lib/state.js';
 import { sendWs } from '../lib/ws.js';
+import { encryptMessage, importPublicKey } from '../lib/crypto.js';
 
 export function renderComposer(convId) {
   const wrap = document.createElement('div');
@@ -18,14 +19,12 @@ export function renderComposer(convId) {
 
   wrap.append(textarea, sendBtn);
 
-  // Auto-resize
   textarea.addEventListener('input', () => {
     textarea.style.height = 'auto';
     textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
     sendWs({ type: 'typing' });
   });
 
-  // Enter = отправить, Shift+Enter = перенос
   textarea.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -50,18 +49,19 @@ export function renderComposer(convId) {
       content,
       created_at: now,
       status: 'pending',
+      _decrypted: true,
     };
 
-    // Оптимистичный UI
     const prev = state.messages[convId] || [];
     state.messages = { ...state.messages, [convId]: [optimistic, ...prev] };
 
     try {
-      const data = await api.post(`/conversations/${convId}/messages`, { content });
+      const body = await buildMessageBody(content, convId);
+      const data = await api.post(`/conversations/${convId}/messages`, body);
       const msgs = state.messages[convId] || [];
       state.messages = {
         ...state.messages,
-        [convId]: msgs.map(m => m.id === tmpId ? { ...data.message, status: 'sent' } : m),
+        [convId]: msgs.map(m => m.id === tmpId ? { ...data.message, status: 'sent', _decrypted: true, content } : m),
       };
     } catch {
       const msgs = state.messages[convId] || [];
@@ -73,6 +73,25 @@ export function renderComposer(convId) {
   }
 
   return wrap;
+}
+
+async function buildMessageBody(content, convId) {
+  const myKeyPair = state.myKeyPair;
+  if (!myKeyPair) return { content };
+
+  const conv = state.conversations.find(c => c.id === convId);
+  if (!conv || conv.type !== 'direct') return { content };
+
+  const other = conv.members?.find(m => m.id !== state.user.id);
+  if (!other?.public_key) return { content };
+
+  try {
+    const theirPublicKey = await importPublicKey(other.public_key);
+    const encrypted = await encryptMessage(content, myKeyPair.privateKey, theirPublicKey);
+    return { content: encrypted.content, nonce: encrypted.nonce };
+  } catch {
+    return { content };
+  }
 }
 
 function iconSend() {

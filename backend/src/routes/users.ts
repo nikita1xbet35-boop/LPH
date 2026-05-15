@@ -8,8 +8,8 @@ export async function handleUsers(request: Request, env: Env, path: string): Pro
 
     if (path === '/api/users' && request.method === 'GET') {
       const { results } = await env.DB.prepare(
-        'SELECT id, username, display_name, last_seen FROM users WHERE id != ?'
-      ).bind(ctx.user.id).all<Pick<User, 'id' | 'username' | 'display_name' | 'last_seen'>>();
+        'SELECT id, username, display_name, last_seen, public_key FROM users WHERE id != ?'
+      ).bind(ctx.user.id).all<Pick<User, 'id' | 'username' | 'display_name' | 'last_seen' | 'public_key'>>();
       return json(results, 200, env, request);
     }
 
