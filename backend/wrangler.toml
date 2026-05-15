@@ -2,11 +2,12 @@ name = "messenger-api"
 main = "src/index.ts"
 compatibility_date = "2024-12-01"
 compatibility_flags = ["nodejs_compat"]
+account_id = "71b0e14ca51602c50c338294d5db1d8c"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "messenger"
-database_id = "PLACEHOLDER_PUT_REAL_ID_AFTER_CREATE"
+database_id = "a9b891f2-b3ec-4ef8-bc46-e3e04e8bad97"
 
 [[durable_objects.bindings]]
 name = "CHAT_ROOM"
@@ -17,5 +18,5 @@ tag = "v1"
 new_classes = ["ChatRoom"]
 
 [vars]
-JWT_SECRET = "REPLACE_WITH_RANDOM_64_CHAR_STRING"
+JWT_SECRET = "da977971d374d3b74b71824d78bd9cb1adcd2d3dfe75469741dbed1d829c9285"
 ADMIN_USERNAME = "admin"
