@@ -3,9 +3,19 @@ import { formatTime, formatDate } from '../lib/utils.js';
 import { api } from '../lib/api.js';
 import { decryptMessage, importPublicKey } from '../lib/crypto.js';
 
+function applyWatermark(el) {
+  const name = state.user?.display_name || state.user?.username || '';
+  if (!name) return;
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='220' height='160'><text x='50%' y='50%' font-family='Inter,system-ui,sans-serif' font-size='13' fill='rgba(255,255,255,0.045)' text-anchor='middle' dominant-baseline='middle' transform='rotate(-25 110 80)'>${name.replace(/[<>&'"]/g, '')}</text></svg>`;
+  el.style.backgroundImage = `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+  el.style.backgroundRepeat = 'repeat';
+  el.style.backgroundSize = '220px 160px';
+}
+
 export function renderMessageList(convId, isGroup) {
   const container = document.createElement('div');
   container.className = 'message-list';
+  applyWatermark(container);
 
   async function render() {
     const msgs = (state.messages[convId] || []).slice().reverse();
