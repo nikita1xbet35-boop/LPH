@@ -2,6 +2,8 @@ import { api } from '../lib/api.js';
 import { state } from '../lib/state.js';
 import { sendWs } from '../lib/ws.js';
 import { encryptMessage, importPublicKeyField } from '../lib/crypto.js';
+import { attachVoiceRecorder } from './voice-recorder.js';
+import { attachVideoRecorder } from './video-recorder.js';
 
 export function renderComposer(convId) {
   const wrap = document.createElement('div');
@@ -28,54 +30,67 @@ export function renderComposer(convId) {
   textarea.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      send();
+      sendText();
     }
   });
 
-  sendBtn.addEventListener('click', send);
+  sendBtn.addEventListener('click', sendText);
 
-  async function send() {
+  async function sendText() {
     const content = textarea.value.trim();
     if (!content) return;
     textarea.value = '';
     textarea.style.height = 'auto';
-
-    const tmpId = 'tmp_' + Date.now();
-    const now = Math.floor(Date.now() / 1000);
-    const optimistic = {
-      id: tmpId,
-      conversation_id: convId,
-      sender_id: state.user.id,
-      content,
-      created_at: now,
-      status: 'pending',
-      _decrypted: true,
-    };
-
-    const prev = state.messages[convId] || [];
-    state.messages = { ...state.messages, [convId]: [optimistic, ...prev] };
-
-    try {
-      const body = await buildMessageBody(content, convId);
-      const data = await api.post(`/conversations/${convId}/messages`, body);
-      const msgs = state.messages[convId] || [];
-      state.messages = {
-        ...state.messages,
-        [convId]: msgs.map(m => m.id === tmpId ? { ...data.message, status: 'sent', _decrypted: true, content } : m),
-      };
-    } catch {
-      const msgs = state.messages[convId] || [];
-      state.messages = {
-        ...state.messages,
-        [convId]: msgs.map(m => m.id === tmpId ? { ...m, status: 'failed' } : m),
-      };
-    }
+    await sendMessage(content, convId);
   }
+
+  function onSendMedia(mediaObj) {
+    sendMessage(JSON.stringify(mediaObj), convId);
+  }
+
+  attachVoiceRecorder(wrap, onSendMedia);
+  attachVideoRecorder(wrap, onSendMedia);
 
   return wrap;
 }
 
+async function sendMessage(content, convId) {
+  const tmpId = 'tmp_' + Date.now();
+  const now = Math.floor(Date.now() / 1000);
+  const optimistic = {
+    id: tmpId,
+    conversation_id: convId,
+    sender_id: state.user.id,
+    content,
+    created_at: now,
+    status: 'pending',
+    _decrypted: true,
+  };
+
+  const prev = state.messages[convId] || [];
+  state.messages = { ...state.messages, [convId]: [optimistic, ...prev] };
+
+  try {
+    const body = await buildMessageBody(content, convId);
+    const data = await api.post(`/conversations/${convId}/messages`, body);
+    const msgs = state.messages[convId] || [];
+    state.messages = {
+      ...state.messages,
+      [convId]: msgs.map(m => m.id === tmpId ? { ...data.message, status: 'sent', _decrypted: true, content } : m),
+    };
+  } catch {
+    const msgs = state.messages[convId] || [];
+    state.messages = {
+      ...state.messages,
+      [convId]: msgs.map(m => m.id === tmpId ? { ...m, status: 'failed' } : m),
+    };
+  }
+}
+
 async function buildMessageBody(content, convId) {
+  // Media messages are not E2E encrypted
+  if (content.startsWith('{"t":"')) return { content };
+
   const myKeyPair = state.myKeyPair;
   if (!myKeyPair) return { content };
 

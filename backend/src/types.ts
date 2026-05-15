@@ -1,6 +1,7 @@
 export interface Env {
   DB: D1Database;
   CHAT_ROOM: DurableObjectNamespace;
+  MEDIA: R2Bucket;
   JWT_SECRET: string;
   ADMIN_USERNAME: string;
   ALLOWED_ORIGIN?: string;

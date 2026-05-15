@@ -18,6 +18,10 @@ class_name = "ChatRoom"
 tag = "v1"
 new_sqlite_classes = ["ChatRoom"]
 
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "messenger-media"
+
 [vars]
 JWT_SECRET = "da977971d374d3b74b71824d78bd9cb1adcd2d3dfe75469741dbed1d829c9285"
 ADMIN_USERNAME = "admin"

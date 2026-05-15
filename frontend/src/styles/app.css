@@ -466,3 +466,178 @@ td { color: var(--text-0); }
   th, td { padding: var(--sp-1) var(--sp-2); }
 }
 
+/* ─── Voice recording bar ─── */
+.rec-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex: 1;
+}
+.rec-pulse {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--danger);
+  animation: pulse 0.8s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.7); }
+}
+.rec-timer {
+  font-size: var(--fs-sm);
+  color: var(--danger);
+  font-variant-numeric: tabular-nums;
+  min-width: 36px;
+}
+
+/* ─── Audio bubble ─── */
+.media-audio {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-lg);
+  min-width: 200px;
+  max-width: 280px;
+}
+.media-audio.own { background: var(--bg-3); }
+.media-audio.other { background: var(--bg-1); border: 1px solid var(--border); }
+.media-play-btn {
+  width: 32px; height: 32px;
+  min-width: 32px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-fg);
+  display: flex; align-items: center; justify-content: center;
+}
+.media-progress {
+  flex: 1;
+  height: 3px;
+  background: var(--bg-3);
+  border-radius: 2px;
+  cursor: pointer;
+  position: relative;
+}
+.media-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  width: 0;
+  transition: width 0.1s linear;
+}
+.media-dur {
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  min-width: 28px;
+  text-align: right;
+}
+
+/* ─── Video circle bubble ─── */
+.media-video-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.media-video-circle {
+  width: 200px; height: 200px;
+  border-radius: 50%;
+  overflow: hidden;
+  position: relative;
+  cursor: pointer;
+  background: #000;
+  border: 2px solid var(--border);
+}
+.media-video-circle video {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.media-video-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.3);
+  color: #fff;
+  border-radius: 50%;
+  transition: opacity var(--t-fast);
+}
+.media-video-dur {
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+  text-align: center;
+}
+
+/* ─── Video recorder overlay ─── */
+.video-rec-overlay {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.video-rec-wrap {
+  position: relative;
+  width: min(90vw, 90vh);
+  height: min(90vw, 90vh);
+}
+.video-rec-preview {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
+  transform: scaleX(-1);
+}
+.video-rec-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 4px solid var(--border);
+  pointer-events: none;
+}
+.video-rec-controls {
+  position: absolute;
+  bottom: -70px;
+  left: 0; right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-5);
+}
+.video-rec-btn {
+  width: 64px; height: 64px;
+  border-radius: 50%;
+  background: var(--danger);
+  border: 4px solid #fff;
+  cursor: pointer;
+  transition: transform var(--t-fast);
+}
+.video-rec-btn.recording {
+  background: #fff;
+  border-color: var(--danger);
+  transform: scale(0.8);
+}
+.video-rec-timer {
+  position: absolute;
+  top: -32px;
+  left: 50%; transform: translateX(-50%);
+  color: #fff;
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  transition: opacity var(--t-fast);
+}
+.video-rec-confirm {
+  display: flex;
+  gap: var(--sp-3);
+  margin-top: var(--sp-2);
+}
+
+@media (max-width: 768px) {
+  .media-video-circle { width: 160px; height: 160px; }
+  .media-audio { min-width: 160px; }
+}
+
+

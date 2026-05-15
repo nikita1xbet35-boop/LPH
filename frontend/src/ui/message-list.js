@@ -1,6 +1,6 @@
 import { state, on, off } from '../lib/state.js';
 import { formatTime, formatDate } from '../lib/utils.js';
-import { api } from '../lib/api.js';
+import { api, mediaUrl } from '../lib/api.js';
 import { decryptMessage, importPublicKeyField } from '../lib/crypto.js';
 
 export function renderMessageList(convId, isGroup) {
@@ -19,7 +19,6 @@ export function renderMessageList(convId, isGroup) {
       return;
     }
 
-    // Для direct-чатов получаем ключ собеседника
     let theirPublicKey = null;
     if (!isGroup && state.myKeyPair) {
       const conv = state.conversations.find(c => c.id === convId);
@@ -70,6 +69,115 @@ export function renderMessageList(convId, isGroup) {
   return container;
 }
 
+function parseMedia(content) {
+  if (!content || content[0] !== '{') return null;
+  try {
+    const obj = JSON.parse(content);
+    if (obj.t === 'audio' || obj.t === 'video') return obj;
+  } catch {}
+  return null;
+}
+
+function fmtDur(s) {
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+function renderAudioBubble(media, isOwn) {
+  const wrap = document.createElement('div');
+  wrap.className = `media-audio ${isOwn ? 'own' : 'other'}`;
+
+  const playBtn = document.createElement('button');
+  playBtn.className = 'media-play-btn';
+  playBtn.innerHTML = iconPlay();
+
+  const progress = document.createElement('div');
+  progress.className = 'media-progress';
+  const fill = document.createElement('div');
+  fill.className = 'media-progress-fill';
+  progress.appendChild(fill);
+
+  const dur = document.createElement('span');
+  dur.className = 'media-dur';
+  dur.textContent = fmtDur(media.dur || 0);
+
+  wrap.append(playBtn, progress, dur);
+
+  const audio = new Audio(mediaUrl(media.url));
+  let playing = false;
+
+  audio.addEventListener('timeupdate', () => {
+    if (!audio.duration) return;
+    fill.style.width = (audio.currentTime / audio.duration * 100) + '%';
+    dur.textContent = fmtDur(Math.floor(audio.duration - audio.currentTime));
+  });
+  audio.addEventListener('ended', () => {
+    playing = false;
+    playBtn.innerHTML = iconPlay();
+    fill.style.width = '0';
+    dur.textContent = fmtDur(media.dur || 0);
+  });
+
+  progress.addEventListener('click', (e) => {
+    if (!audio.duration) return;
+    const rect = progress.getBoundingClientRect();
+    audio.currentTime = (e.clientX - rect.left) / rect.width * audio.duration;
+  });
+
+  playBtn.addEventListener('click', () => {
+    if (playing) {
+      audio.pause();
+      playing = false;
+      playBtn.innerHTML = iconPlay();
+    } else {
+      audio.play();
+      playing = true;
+      playBtn.innerHTML = iconPause();
+    }
+  });
+
+  return wrap;
+}
+
+function renderVideoBubble(media) {
+  const wrap = document.createElement('div');
+  wrap.className = 'media-video-wrap';
+
+  const circle = document.createElement('div');
+  circle.className = 'media-video-circle';
+
+  const video = document.createElement('video');
+  video.src = mediaUrl(media.url);
+  video.playsInline = true;
+  video.setAttribute('webkit-playsinline', '');
+  video.loop = true;
+  video.preload = 'metadata';
+
+  const overlay = document.createElement('div');
+  overlay.className = 'media-video-overlay';
+  overlay.innerHTML = iconPlay();
+
+  let playing = false;
+  circle.addEventListener('click', () => {
+    if (playing) {
+      video.pause();
+      playing = false;
+      overlay.style.opacity = '1';
+    } else {
+      video.play();
+      playing = true;
+      overlay.style.opacity = '0';
+    }
+  });
+
+  const dur = document.createElement('div');
+  dur.className = 'media-video-dur';
+  dur.textContent = fmtDur(media.dur || 0);
+
+  circle.append(video, overlay);
+  wrap.append(circle, dur);
+  return wrap;
+}
+
 function renderBubble(msg, isEncrypted, isGroup, decryptFailed) {
   const isOwn = msg.sender_id === state.user?.id;
   const wrap = document.createElement('div');
@@ -82,25 +190,47 @@ function renderBubble(msg, isEncrypted, isGroup, decryptFailed) {
     wrap.appendChild(sender);
   }
 
-  const bubble = document.createElement('div');
-  bubble.className = `message-bubble ${isOwn ? 'own' : 'other'}${msg.status === 'pending' ? ' pending' : ''}${msg.status === 'failed' ? ' failed' : ''}${decryptFailed ? ' decrypt-failed' : ''}`;
+  const media = !decryptFailed ? parseMedia(msg.content) : null;
 
-  if (decryptFailed) {
-    bubble.innerHTML = `<span style="opacity:0.5">🔒</span>`;
+  if (media) {
+    // Media bubble — no text bubble wrapper
+    const mediaBubble = media.t === 'video'
+      ? renderVideoBubble(media)
+      : renderAudioBubble(media, isOwn);
+    wrap.appendChild(mediaBubble);
+
+    const meta = document.createElement('div');
+    meta.className = 'message-time';
+    meta.textContent = formatTime(msg.created_at);
+    if (media.t !== 'video') wrap.appendChild(meta);
   } else {
-    bubble.textContent = msg.content;
+    const bubble = document.createElement('div');
+    bubble.className = `message-bubble ${isOwn ? 'own' : 'other'}${msg.status === 'pending' ? ' pending' : ''}${msg.status === 'failed' ? ' failed' : ''}${decryptFailed ? ' decrypt-failed' : ''}`;
+
+    if (decryptFailed) {
+      bubble.innerHTML = `<span style="opacity:0.5">🔒</span>`;
+    } else {
+      bubble.textContent = msg.content;
+    }
+
+    wrap.appendChild(bubble);
+
+    const meta = document.createElement('div');
+    meta.className = 'message-time';
+    meta.textContent = formatTime(msg.created_at) + (isEncrypted && !decryptFailed ? ' 🔒' : '');
+    wrap.appendChild(meta);
   }
-
-  wrap.appendChild(bubble);
-
-  const meta = document.createElement('div');
-  meta.className = 'message-time';
-  meta.textContent = formatTime(msg.created_at) + (isEncrypted && !decryptFailed ? ' 🔒' : '');
-  wrap.appendChild(meta);
 
   if (!isOwn && msg.id && !msg.id.startsWith('tmp_')) {
     api.post(`/messages/${msg.id}/read`).catch(() => {});
   }
 
   return wrap;
+}
+
+function iconPlay() {
+  return `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><polygon points="3,2 13,8 3,14"/></svg>`;
+}
+function iconPause() {
+  return `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="3" y="2" width="4" height="12"/><rect x="9" y="2" width="4" height="12"/></svg>`;
 }
