@@ -1,10 +1,12 @@
 html, body, #app {
   height: 100%;
+  height: var(--app-height, 100%);
   background: var(--bg-0);
   color: var(--text-0);
   font-family: var(--font);
   font-size: var(--fs-base);
   line-height: var(--lh-base);
+  overflow: hidden;
 }
 
 /* Scrollbars */
@@ -405,8 +407,12 @@ td { color: var(--text-0); }
 
 /* ─── Mobile ─── */
 @media (max-width: 768px) {
+  /* Предотвращаем зум при фокусе на инпут (iOS требует font-size >= 16px) */
+  input, textarea, select { font-size: 16px !important; }
+
   /* Login */
   .login-card { padding: var(--sp-6) var(--sp-4); }
+  .login-wrap { height: var(--app-height, 100%); }
 
   /* Chat layout — одна колонка */
   .chat-layout { position: relative; overflow: hidden; }

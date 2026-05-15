@@ -6,6 +6,23 @@ import { renderLogin } from './ui/login-view.js';
 import { renderChat } from './ui/chat-view.js';
 import { renderAdmin } from './ui/admin-view.js';
 
+// Service Worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+
+// Фикс высоты под виртуальную клавиатуру iOS
+function setupViewport() {
+  const update = () => {
+    const h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    document.documentElement.style.setProperty('--app-height', `${h}px`);
+  };
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', update);
+  window.addEventListener('resize', update);
+  update();
+}
+setupViewport();
+
 const app = document.getElementById('app');
 let currentView = null;
 
