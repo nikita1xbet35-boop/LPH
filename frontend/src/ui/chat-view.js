@@ -16,30 +16,21 @@ export async function renderChat() {
 
   const mainArea = document.createElement('div');
   mainArea.className = 'chat-main';
-
-  const empty = document.createElement('div');
-  empty.className = 'chat-empty';
-  empty.textContent = 'Select a chat';
-  mainArea.appendChild(empty);
+  mainArea.innerHTML = '<div class="chat-empty">Select a chat</div>';
 
   layout.append(sidebar, mainArea);
 
   let currentConvId = null;
-  let msgListEl = null;
-  let composerEl = null;
   let headerEl = null;
+  let msgListEl = null;
 
-  // Обработчик WS сообщений
   setMessageHandler((msg) => {
     if (msg.type === 'message:new') {
       const m = msg.data.message;
-      const convId = m.conversation_id;
-      const existing = state.messages[convId] || [];
-      // Не дублируем
+      const existing = state.messages[m.conversation_id] || [];
       if (!existing.find(e => e.id === m.id)) {
-        state.messages = { ...state.messages, [convId]: [m, ...existing] };
+        state.messages = { ...state.messages, [m.conversation_id]: [m, ...existing] };
       }
-      // Обновляем превью в сайдбаре
       loadConversations();
     } else if (msg.type === 'message:deleted') {
       if (!currentConvId) return;
@@ -57,11 +48,14 @@ export async function renderChat() {
   async function selectConv(convId) {
     if (currentConvId === convId) return;
     disconnect();
+    if (msgListEl?._destroy) msgListEl._destroy();
     currentConvId = convId;
     state.activeConvId = convId;
 
-    // Перезагружаем conversations чтобы получить актуальные public_key членов
+    // Перезагружаем чтобы получить актуальные public_key членов
     await loadConversations();
+    const conv = state.conversations.find(c => c.id === convId);
+    if (!conv) return;
 
     // Загружаем сообщения
     try {
@@ -69,54 +63,50 @@ export async function renderChat() {
       state.messages = { ...state.messages, [convId]: msgs };
     } catch {}
 
-    // Рендерим main area
     mainArea.innerHTML = '';
 
-    headerEl = renderHeader(conv);
+    headerEl = document.createElement('div');
+    headerEl.className = 'chat-header';
+    renderHeaderContent(headerEl, conv);
     mainArea.appendChild(headerEl);
 
-    const isGroup = conv?.type === 'group';
-    msgListEl = renderMessageList(convId, isGroup);
+    msgListEl = renderMessageList(convId, conv.type === 'group');
     mainArea.appendChild(msgListEl);
 
-    composerEl = renderComposer(convId);
-    mainArea.appendChild(composerEl);
+    mainArea.appendChild(renderComposer(convId));
 
     connect(convId);
   }
 
-  function renderHeader(conv) {
-    const header = document.createElement('div');
-    header.className = 'chat-header';
-    header.dataset.convId = conv?.id;
-    updateHeader(header, conv);
-    return header;
-  }
-
-  function updateHeader(el, conv) {
-    const h = el || headerEl;
-    const c = conv || state.conversations.find(c => c.id === currentConvId);
-    if (!h || !c) return;
-
-    const name = getConvName(c);
-    const other = c.members?.find(m => m.id !== state.user?.id);
+  function renderHeaderContent(el, conv) {
+    if (!el || !conv) return;
+    const other = conv.members?.find(m => m.id !== state.user?.id);
     const isOnline = other && state.onlineUsers.has(other.id);
-    const status = c.type === 'direct' ? (isOnline ? 'online' : formatLastSeen(other?.last_seen)) : `${c.members?.length ?? 0} members`;
-
-    h.innerHTML = `
+    const name = conv.type === 'group'
+      ? (conv.name || 'Group')
+      : (other?.display_name || other?.username || 'Chat');
+    const status = conv.type === 'direct'
+      ? (isOnline ? 'online' : formatLastSeen(other?.last_seen))
+      : `${conv.members?.length ?? 0} members`;
+    el.innerHTML = `
       <div class="chat-header-name">${escHtml(name)}</div>
       <div class="chat-header-status">${status}</div>
     `;
   }
 
-  // Синхронизируем header при изменении onlineUsers
-  on('onlineUsers', () => updateHeader());
+  function updateHeader() {
+    if (!headerEl || !currentConvId) return;
+    const conv = state.conversations.find(c => c.id === currentConvId);
+    renderHeaderContent(headerEl, conv);
+  }
+
+  on('onlineUsers', updateHeader);
 
   layout._destroy = () => {
     disconnect();
     sidebar._destroy?.();
-    if (msgListEl) msgListEl._destroy?.();
-    off('onlineUsers', () => updateHeader());
+    msgListEl?._destroy?.();
+    off('onlineUsers', updateHeader);
   };
 
   return layout;
@@ -124,17 +114,10 @@ export async function renderChat() {
 
 async function loadConversations() {
   try {
-    const data = await api.get('/conversations');
-    state.conversations = data;
+    state.conversations = await api.get('/conversations');
   } catch {}
 }
 
-function getConvName(conv) {
-  if (conv.type === 'group') return conv.name ?? 'Group';
-  const other = conv.members?.find(m => m.id !== state.user?.id);
-  return other?.display_name || other?.username || 'Chat';
-}
-
 function escHtml(str) {
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }

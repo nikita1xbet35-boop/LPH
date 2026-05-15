@@ -10,24 +10,27 @@ export function renderMessageList(convId, isGroup) {
   async function render() {
     const msgs = (state.messages[convId] || []).slice().reverse();
     container.innerHTML = '';
+
     if (!msgs.length) {
-      container.innerHTML = '<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-2);font-size:13px">No messages yet</div>';
+      const empty = document.createElement('div');
+      empty.style.cssText = 'flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-2);font-size:13px';
+      empty.textContent = 'No messages yet';
+      container.appendChild(empty);
       return;
     }
 
-    // Получаем публичный ключ собеседника для расшифровки
-    const conv = state.conversations.find(c => c.id === convId);
-    const other = conv?.members?.find(m => m.id !== state.user?.id);
+    // Для direct-чатов получаем ключ собеседника
     let theirPublicKey = null;
-    if (!isGroup && other?.public_key && state.myKeyPair) {
-      try { theirPublicKey = await importPublicKey(other.public_key); } catch {}
+    if (!isGroup && state.myKeyPair) {
+      const conv = state.conversations.find(c => c.id === convId);
+      const other = conv?.members?.find(m => m.id !== state.user?.id);
+      if (other?.public_key) {
+        try { theirPublicKey = await importPublicKey(other.public_key); } catch {}
+      }
     }
 
-    // Расшифровываем сообщения
-    const decrypted = await Promise.all(msgs.map(msg => decryptMsg(msg, theirPublicKey)));
-
     let lastDate = null;
-    for (const msg of decrypted) {
+    for (const msg of msgs) {
       const dateLabel = formatDate(msg.created_at);
       if (dateLabel !== lastDate) {
         lastDate = dateLabel;
@@ -36,8 +39,20 @@ export function renderMessageList(convId, isGroup) {
         sep.textContent = dateLabel;
         container.appendChild(sep);
       }
-      container.appendChild(renderMessage(msg, isGroup));
+
+      // Расшифровываем если есть nonce и ключ
+      let displayContent = msg.content;
+      let decrypted = false;
+      if (msg.nonce && theirPublicKey && state.myKeyPair && !msg._decrypted) {
+        displayContent = await decryptMessage(msg.content, msg.nonce, state.myKeyPair.privateKey, theirPublicKey);
+        decrypted = true;
+      } else if (msg._decrypted) {
+        decrypted = true;
+      }
+
+      container.appendChild(renderBubble({ ...msg, content: displayContent }, decrypted || !!msg.nonce, isGroup));
     }
+
     container.scrollTop = container.scrollHeight;
   }
 
@@ -49,21 +64,10 @@ export function renderMessageList(convId, isGroup) {
   return container;
 }
 
-async function decryptMsg(msg, theirPublicKey) {
-  if (msg._decrypted) return msg;
-  if (!msg.nonce || !theirPublicKey || !state.myKeyPair) return msg;
-
-  // Определяем чей ключ использовать: если я отправитель — расшифровываем своим ключом от их публичного
-  // Если они отправитель — расшифровываем своим от их публичного (симметрично)
-  const content = await decryptMessage(msg.content, msg.nonce, state.myKeyPair.privateKey, theirPublicKey);
-  return { ...msg, content, _decrypted: true };
-}
-
-function renderMessage(msg, isGroup) {
+function renderBubble(msg, isEncrypted, isGroup) {
   const isOwn = msg.sender_id === state.user?.id;
   const wrap = document.createElement('div');
   wrap.className = 'message-wrap ' + (isOwn ? 'own' : 'other');
-  wrap.dataset.id = msg.id;
 
   if (isGroup && !isOwn) {
     const sender = document.createElement('div');
@@ -74,20 +78,12 @@ function renderMessage(msg, isGroup) {
 
   const bubble = document.createElement('div');
   bubble.className = `message-bubble ${isOwn ? 'own' : 'other'}${msg.status === 'pending' ? ' pending' : ''}${msg.status === 'failed' ? ' failed' : ''}`;
-
-  // Если зашифровано но не расшифровалось — показываем замок
-  if (msg.nonce && !msg._decrypted) {
-    bubble.innerHTML = `<span style="color:var(--text-2)">🔒 encrypted</span>`;
-  } else {
-    bubble.textContent = msg.content;
-  }
-
+  bubble.textContent = msg.content;
   wrap.appendChild(bubble);
 
-  // Иконка замка для E2E сообщений
   const meta = document.createElement('div');
   meta.className = 'message-time';
-  meta.textContent = formatTime(msg.created_at) + (msg.nonce ? ' 🔒' : '');
+  meta.textContent = formatTime(msg.created_at) + (isEncrypted ? ' 🔒' : '');
   wrap.appendChild(meta);
 
   if (!isOwn && msg.id && !msg.id.startsWith('tmp_')) {
