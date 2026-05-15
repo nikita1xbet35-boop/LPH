@@ -35,6 +35,29 @@ export async function handleUsers(request: Request, env: Env, path: string): Pro
       return json({ user: updated }, 200, env, request);
     }
 
+    // DELETE /api/users/me/messages — wipe all messages sent by this user
+    if (path === '/api/users/me/messages' && request.method === 'DELETE') {
+      const convRows = await env.DB.prepare(
+        'SELECT DISTINCT conversation_id FROM messages WHERE sender_id = ?'
+      ).bind(ctx.user.id).all<{ conversation_id: string }>();
+
+      await env.DB.prepare('DELETE FROM messages WHERE sender_id = ?').bind(ctx.user.id).run();
+
+      for (const row of convRows.results) {
+        try {
+          const doId = env.CHAT_ROOM.idFromName(row.conversation_id);
+          const stub = env.CHAT_ROOM.get(doId);
+          await stub.fetch('https://internal/broadcast', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: 'messages:purged', data: { user_id: ctx.user.id, conversation_id: row.conversation_id } }),
+          });
+        } catch {}
+      }
+
+      return json({ ok: true }, 200, env, request);
+    }
+
     return err('not_found', 'Not found', 404, env, request);
   } catch (e) {
     if (e instanceof AuthError) return err('unauthorized', 'Unauthorized', 401, env, request);

@@ -61,32 +61,40 @@ export function renderComposer(convId) {
 
   sendBtn.addEventListener('click', sendText);
 
-  // Media button: tap → toggle mic/cam; hold (>300ms) → start voice recording
+  // Mic mode: short tap → switch to cam; hold 280ms → voice record
+  // Cam mode: short tap → open video recorder; long press 600ms → switch back to mic
   let holdTimer = null;
   let didHold = false;
+  let justSwitchedToCam = false;
 
   function onMediaDown(e) {
     e.preventDefault();
     didHold = false;
+    const delay = mediaMode === 'mic' ? 280 : 600;
     holdTimer = setTimeout(() => {
+      didHold = true;
       if (mediaMode === 'mic') {
-        didHold = true;
         startVoiceRecording(wrap, textarea, mediaBtn, onSendMedia);
+      } else {
+        setMode('mic');
       }
-    }, 280);
+    }, delay);
   }
 
   function onMediaUp(e) {
     e.preventDefault();
     clearTimeout(holdTimer);
-    if (!didHold) {
-      // Short tap: toggle mode
-      setMode(mediaMode === 'mic' ? 'cam' : 'mic');
+    if (!didHold && mediaMode === 'mic') {
+      justSwitchedToCam = true;
+      setMode('cam');
     }
   }
 
   function onMediaClick(e) {
-    // If camera mode: open video recorder on click
+    if (justSwitchedToCam) {
+      justSwitchedToCam = false;
+      return; // Same click that switched mic→cam, don't open recorder yet
+    }
     if (mediaMode === 'cam' && !didHold) {
       openVideoRecorder(onSendMedia);
     }

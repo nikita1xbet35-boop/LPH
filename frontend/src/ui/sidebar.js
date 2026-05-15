@@ -24,11 +24,15 @@ export function renderSidebar(onSelect) {
   const userLabel = document.createElement('div');
   userLabel.className = 'sidebar-user';
   userLabel.textContent = state.user?.username ?? '';
+  const purgeBtn = document.createElement('button');
+  purgeBtn.className = 'btn-icon';
+  purgeBtn.title = 'Delete all my messages';
+  purgeBtn.innerHTML = iconTrash();
   const logoutBtn = document.createElement('button');
   logoutBtn.className = 'btn-icon';
   logoutBtn.title = 'Sign out';
   logoutBtn.innerHTML = iconLogout();
-  footer.append(userLabel, logoutBtn);
+  footer.append(userLabel, purgeBtn, logoutBtn);
 
   sidebar.append(header, list, footer);
 
@@ -81,6 +85,22 @@ export function renderSidebar(onSelect) {
     document.body.appendChild(modal);
   });
 
+  purgeBtn.addEventListener('click', async () => {
+    const ok = confirm('Delete all your messages for everyone? This cannot be undone.');
+    if (!ok) return;
+    purgeBtn.disabled = true;
+    try {
+      await api.delete('/users/me/messages');
+      state.messages = {};
+      state.conversations = [];
+      await loadConversations();
+    } catch (e) {
+      alert('Failed: ' + e.message);
+    } finally {
+      purgeBtn.disabled = false;
+    }
+  });
+
   logoutBtn.addEventListener('click', async () => {
     try { await api.post('/auth/logout'); } catch {}
     storage.clear();
@@ -122,5 +142,14 @@ function iconLogout() {
     <path d="M6 2H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/>
     <polyline points="11 11 14 8 11 5"/>
     <line x1="14" y1="8" x2="6" y2="8"/>
+  </svg>`;
+}
+
+function iconTrash() {
+  return `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="2 4 14 4"/>
+    <path d="M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/>
+    <path d="M6 7v5M10 7v5"/>
+    <path d="M3 4l1 9a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l1-9"/>
   </svg>`;
 }

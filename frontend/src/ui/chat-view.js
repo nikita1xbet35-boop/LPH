@@ -49,6 +49,12 @@ export async function renderChat() {
       if (!currentConvId) return;
       const existing = state.messages[currentConvId] || [];
       state.messages = { ...state.messages, [currentConvId]: existing.filter(m => m.id !== msg.data.id) };
+    } else if (msg.type === 'messages:purged') {
+      const convId = msg.data.conversation_id;
+      const uid = msg.data.user_id;
+      const existing = state.messages[convId] || [];
+      state.messages = { ...state.messages, [convId]: existing.filter(m => m.sender_id !== uid) };
+      loadConversations();
     } else if (msg.type === 'presence') {
       const { user_id, online } = msg.data;
       const set = new Set(state.onlineUsers);

@@ -15,9 +15,8 @@ body::before {
   position: fixed;
   inset: 0;
   background:
-    radial-gradient(ellipse 700px 500px at -5% -5%, rgba(124,90,240,0.18) 0%, transparent 65%),
-    radial-gradient(ellipse 500px 400px at 105% 105%, rgba(99,102,241,0.12) 0%, transparent 60%),
-    radial-gradient(ellipse 400px 300px at 105% 0%, rgba(167,139,250,0.07) 0%, transparent 55%);
+    radial-gradient(ellipse 600px 400px at -10% -10%, rgba(124,90,240,0.06) 0%, transparent 60%),
+    radial-gradient(ellipse 400px 300px at 110% 110%, rgba(99,102,241,0.04) 0%, transparent 55%);
   pointer-events: none;
   z-index: 0;
 }
@@ -83,8 +82,6 @@ body::before {
   display: flex;
   align-items: center;
   justify-content: center;
-  background:
-    radial-gradient(ellipse 800px 600px at 50% 30%, rgba(124,90,240,0.12) 0%, transparent 70%);
 }
 .login-card {
   width: 100%;
@@ -155,7 +152,7 @@ body::before {
   border-bottom: 1px solid rgba(255,255,255,0.04);
 }
 .conv-item:hover { background: rgba(255,255,255,0.04); }
-.conv-item.active { background: rgba(124,90,240,0.12); border-left: 2px solid var(--accent); padding-left: calc(var(--sp-4) - 2px); }
+.conv-item.active { background: rgba(255,255,255,0.05); border-left: 2px solid var(--accent); padding-left: calc(var(--sp-4) - 2px); }
 .conv-avatar {
   width: 38px; height: 38px; min-width: 38px;
   border-radius: var(--r-lg);
@@ -192,8 +189,9 @@ body::before {
 .sidebar-footer {
   padding: var(--sp-3) var(--sp-4);
   border-top: 1px solid var(--border);
-  display: flex; align-items: center; gap: var(--sp-3);
+  display: flex; align-items: center; gap: var(--sp-1);
 }
+.sidebar-footer .btn-icon:hover { color: var(--danger); background: rgba(239,68,68,0.08); }
 .sidebar-user {
   flex: 1;
   font-size: var(--fs-sm);
@@ -405,11 +403,10 @@ body::before {
 .wave-bar {
   width: 3px;
   border-radius: 2px;
-  background: rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.18);
   transition: background 0.06s;
   flex-shrink: 0;
 }
-.media-audio.own .wave-bar { background: rgba(124,90,240,0.4); }
 .wave-bar.played { background: var(--accent); }
 .wave-bar.other-played { background: var(--text-1); }
 
@@ -461,8 +458,7 @@ body::before {
   position: relative;
   cursor: pointer;
   background: #000;
-  border: 2px solid var(--own-border);
-  box-shadow: 0 4px 24px rgba(124,90,240,0.2);
+  border: 2px solid rgba(255,255,255,0.1);
 }
 .media-video-circle video { width: 100%; height: 100%; object-fit: cover; display: block; }
 .media-video-overlay {
