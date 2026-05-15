@@ -31,7 +31,7 @@ async function main() {
   const id = randomBytes(10).toString('hex');
   const now = Math.floor(Date.now() / 1000);
 
-  const sql = `INSERT OR IGNORE INTO users (id, username, password_hash, display_name, created_at) VALUES ('${id}', 'admin', '${stored}', 'Admin', ${now});`;
+  const sql = `INSERT OR REPLACE INTO users (id, username, password_hash, display_name, created_at) VALUES ('${id}', 'admin', '${stored}', 'Admin', ${now});`;
 
   execSync(`npx wrangler d1 execute messenger --remote --command="${sql}"`, {
     stdio: 'inherit',
