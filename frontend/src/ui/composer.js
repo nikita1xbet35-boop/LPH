@@ -9,50 +9,79 @@ export function renderComposer(convId) {
   const wrap = document.createElement('div');
   wrap.className = 'composer';
 
+  /* ── Attach button (left) ── */
+  const attachBtn = document.createElement('button');
+  attachBtn.className = 'composer-attach-btn';
+  attachBtn.title = 'Attach file';
+  attachBtn.innerHTML = iconAttach();
+
+  /* ── Input wrapper ── */
+  const inputWrap = document.createElement('div');
+  inputWrap.className = 'composer-input-wrap';
+
   const textarea = document.createElement('textarea');
   textarea.className = 'composer-textarea';
   textarea.placeholder = 'Message...';
   textarea.rows = 1;
 
-  // Right-side button: send (when text) or media (mic/cam)
-  const sendBtn = document.createElement('button');
-  sendBtn.className = 'composer-send-btn';
-  sendBtn.innerHTML = iconSend();
+  inputWrap.appendChild(textarea);
 
-  // Media button (mic ↔ camera toggle)
+  /* ── Right side buttons ── */
+  const rightWrap = document.createElement('div');
+  rightWrap.className = 'composer-right';
+
+  /* Media button (mic ↔ cam) */
   const mediaBtn = document.createElement('button');
   mediaBtn.className = 'composer-media-btn';
-  mediaBtn.title = 'Voice message';
 
+  /* Send button */
+  const sendBtn = document.createElement('button');
+  sendBtn.className = 'composer-send-btn';
+  sendBtn.title = 'Send';
+  sendBtn.innerHTML = iconSend();
+
+  rightWrap.append(mediaBtn, sendBtn);
+  wrap.append(attachBtn, inputWrap, rightWrap);
+
+  /* ── State ── */
   let mediaMode = 'mic'; // 'mic' | 'cam'
   let hasText = false;
 
   function setMode(mode) {
     mediaMode = mode;
     mediaBtn.innerHTML = mode === 'mic' ? iconMic() : iconCam();
-    mediaBtn.title = mode === 'mic' ? 'Voice message (hold) / tap for camera' : 'Video circle / tap for mic';
+    mediaBtn.title = mode === 'mic'
+      ? 'Voice message (hold) / tap for camera'
+      : 'Video circle / tap for mic';
   }
   setMode('mic');
 
-  function updateButtons() {
+  /* Animate mic → send / send → mic transition */
+  function updateButtons(animate) {
     if (hasText) {
-      sendBtn.style.display = 'flex';
+      if (animate) sendBtn.style.transform = 'scale(0.7)';
       mediaBtn.style.display = 'none';
+      sendBtn.style.display = 'flex';
+      if (animate) requestAnimationFrame(() => { sendBtn.style.transform = ''; });
     } else {
-      sendBtn.style.display = 'none';
       mediaBtn.style.display = 'flex';
+      sendBtn.style.display = 'none';
     }
   }
 
-  wrap.append(textarea, mediaBtn, sendBtn);
-  updateButtons();
+  sendBtn.style.transition = 'transform 150ms ease, opacity 150ms ease, background 150ms ease';
+  updateButtons(false);
 
+  /* ── Textarea auto-resize ── */
   textarea.addEventListener('input', () => {
     textarea.style.height = 'auto';
-    textarea.style.height = Math.min(textarea.scrollHeight, 180) + 'px';
+    textarea.style.height = Math.min(textarea.scrollHeight, 160) + 'px';
     sendWs({ type: 'typing' });
-    hasText = textarea.value.trim().length > 0;
-    updateButtons();
+    const newHasText = textarea.value.trim().length > 0;
+    if (newHasText !== hasText) {
+      hasText = newHasText;
+      updateButtons(true);
+    }
   });
 
   textarea.addEventListener('keydown', (e) => {
@@ -61,8 +90,7 @@ export function renderComposer(convId) {
 
   sendBtn.addEventListener('click', sendText);
 
-  // Mic mode: short tap → switch to cam; hold 280ms → voice record
-  // Cam mode: short tap → open video recorder; long press 600ms → switch back to mic
+  /* ── Media button: hold for mic, tap to switch mode, cam tap opens recorder ── */
   let holdTimer = null;
   let didHold = false;
   let isTouchEvent = false;
@@ -76,7 +104,7 @@ export function renderComposer(convId) {
     holdTimer = setTimeout(() => {
       didHold = true;
       if (mediaMode === 'mic') {
-        startVoiceRecording(wrap, textarea, mediaBtn, onSendMedia);
+        startVoiceRecording(wrap, textarea, mediaBtn, sendBtn, attachBtn, onSendMedia);
       } else {
         setMode('mic');
       }
@@ -90,14 +118,13 @@ export function renderComposer(convId) {
     if (mediaMode === 'mic') {
       justSwitchedToCam = true;
       setMode('cam');
-      if (isTouchEvent) justSwitchedToCam = false; // no click fires after touch preventDefault
+      if (isTouchEvent) justSwitchedToCam = false;
     } else if (isTouchEvent) {
-      openVideoRecorder(onSendMedia); // touch: click won't fire, open here
+      openVideoRecorder(onSendMedia);
     }
-    // mouse + cam mode: handled by click event
   }
 
-  function onMediaClick(e) {
+  function onMediaClick() {
     if (justSwitchedToCam) { justSwitchedToCam = false; return; }
     if (mediaMode === 'cam' && !didHold) openVideoRecorder(onSendMedia);
   }
@@ -118,20 +145,25 @@ export function renderComposer(convId) {
     textarea.value = '';
     textarea.style.height = 'auto';
     hasText = false;
-    updateButtons();
+    updateButtons(true);
     await sendMessage(content, convId);
   }
 
   return wrap;
 }
 
+/* ── Send message with optimistic update ── */
 async function sendMessage(content, convId) {
   const tmpId = 'tmp_' + Date.now();
   const now = Math.floor(Date.now() / 1000);
   const optimistic = {
-    id: tmpId, conversation_id: convId,
-    sender_id: state.user.id, content,
-    created_at: now, status: 'pending', _decrypted: true,
+    id: tmpId,
+    conversation_id: convId,
+    sender_id: state.user.id,
+    content,
+    created_at: now,
+    status: 'pending',
+    _decrypted: true,
   };
 
   const prev = state.messages[convId] || [];
@@ -143,8 +175,11 @@ async function sendMessage(content, convId) {
     const msgs = state.messages[convId] || [];
     state.messages = {
       ...state.messages,
-      [convId]: msgs.map(m => m.id === tmpId
-        ? { ...data.message, status: 'sent', _decrypted: true, content } : m),
+      [convId]: msgs.map(m =>
+        m.id === tmpId
+          ? { ...data.message, status: 'sent', _decrypted: true, content }
+          : m
+      ),
     };
   } catch {
     const msgs = state.messages[convId] || [];
@@ -156,12 +191,15 @@ async function sendMessage(content, convId) {
 }
 
 async function buildMessageBody(content, convId) {
+  /* Media payloads bypass encryption */
   if (content.startsWith('{"t":"')) return { content };
 
   const myKeyPair = state.myKeyPair;
   if (!myKeyPair) return { content };
+
   const conv = state.conversations.find(c => c.id === convId);
   if (!conv || conv.type !== 'direct') return { content };
+
   const other = conv.members?.find(m => m.id !== state.user.id);
   if (!other?.public_key) return { content };
 
@@ -175,6 +213,24 @@ async function buildMessageBody(content, convId) {
   }
 }
 
-const iconSend = () => `<svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="9" x2="16" y2="9"/><polyline points="10 3 16 9 10 15"/></svg>`;
-const iconMic = () => `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="1" width="6" height="10" rx="3"/><path d="M3 9a6 6 0 0 0 12 0"/><line x1="9" y1="15" x2="9" y2="17"/><line x1="6" y1="17" x2="12" y2="17"/></svg>`;
-const iconCam = () => `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V6z"/><circle cx="9" cy="9.5" r="2.5"/><path d="M6 4l1.2-2h3.6L12 4"/></svg>`;
+/* ── Icons ── */
+const iconSend = () => `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <line x1="2" y1="9" x2="16" y2="9"/><polyline points="10 3 16 9 10 15"/>
+</svg>`;
+
+const iconMic = () => `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="7" y="1" width="6" height="11" rx="3"/>
+  <path d="M3 10a7 7 0 0 0 14 0"/>
+  <line x1="10" y1="17" x2="10" y2="19"/>
+  <line x1="7" y1="19" x2="13" y2="19"/>
+</svg>`;
+
+const iconCam = () => `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M1 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7z"/>
+  <circle cx="10" cy="11" r="3"/>
+  <path d="M7 5l1.5-2h3L13 5"/>
+</svg>`;
+
+const iconAttach = () => `<svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M21 12.5l-9.5 9.5a6 6 0 0 1-8.5-8.5L13 3a4 4 0 0 1 5.7 5.6L8.5 19A2 2 0 0 1 5.6 16L14 7.5"/>
+</svg>`;

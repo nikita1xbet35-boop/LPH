@@ -12,8 +12,19 @@ function blobToBase64(blob) {
   });
 }
 
-// Called by composer on hold. Shows recording UI inline, sends on release.
-export async function startVoiceRecording(composerEl, textarea, mediaBtn, onSendMedia) {
+/**
+ * Called by composer on hold.
+ * Replaces the composer contents with a recording bar.
+ * Sends on pointer release, cancels on X button.
+ *
+ * @param {HTMLElement} composerEl  - the .composer wrapper
+ * @param {HTMLElement} textarea    - textarea to hide
+ * @param {HTMLElement} mediaBtn    - mic/cam button to hide
+ * @param {HTMLElement} sendBtn     - send button to hide
+ * @param {HTMLElement} attachBtn   - attach button to hide
+ * @param {Function}    onSendMedia - callback({ t, data, mime, dur })
+ */
+export async function startVoiceRecording(composerEl, textarea, mediaBtn, sendBtn, attachBtn, onSendMedia) {
   if (!navigator.mediaDevices?.getUserMedia) return;
 
   let stream;
@@ -31,20 +42,41 @@ export async function startVoiceRecording(composerEl, textarea, mediaBtn, onSend
   recorder.start(100);
   const startTime = Date.now();
 
-  // Recording bar replaces textarea + media button
+  /* ── Build recording bar ── */
   const recBar = document.createElement('div');
   recBar.className = 'rec-bar';
-  recBar.innerHTML = `
-    <button class="rec-cancel" title="Cancel">${iconX()}</button>
-    <div class="rec-pulse"></div>
-    <span class="rec-timer">0:00</span>
-    <span class="rec-hint">Release to send</span>
-  `;
+
+  /* Cancel button */
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'rec-cancel-btn';
+  cancelBtn.title = 'Cancel';
+  cancelBtn.innerHTML = iconX();
+
+  /* Pulsing indicator */
+  const pulse = document.createElement('div');
+  pulse.className = 'rec-pulse';
+
+  /* Timer */
+  const timerEl = document.createElement('span');
+  timerEl.className = 'rec-timer';
+  timerEl.textContent = '0:00';
+
+  /* Slide hint */
+  const hint = document.createElement('span');
+  hint.className = 'rec-slide-hint';
+  hint.innerHTML = `${iconArrowLeft()} Slide to cancel`;
+
+  recBar.append(cancelBtn, pulse, timerEl, hint);
+
+  /* Hide existing composer elements */
   textarea.style.display = 'none';
   mediaBtn.style.display = 'none';
+  sendBtn.style.display = 'none';
+  attachBtn.style.display = 'none';
+
+  /* Insert recording bar */
   composerEl.insertBefore(recBar, composerEl.firstChild);
 
-  const timerEl = recBar.querySelector('.rec-timer');
   let cancelled = false;
 
   const timerInterval = setInterval(() => {
@@ -60,9 +92,11 @@ export async function startVoiceRecording(composerEl, textarea, mediaBtn, onSend
     recBar.remove();
     textarea.style.display = '';
     mediaBtn.style.display = '';
+    sendBtn.style.display = '';
+    attachBtn.style.display = '';
   }
 
-  recBar.querySelector('.rec-cancel').addEventListener('click', () => {
+  cancelBtn.addEventListener('click', () => {
     cancelled = true;
     recorder.stop();
     stopStream();
@@ -77,7 +111,7 @@ export async function startVoiceRecording(composerEl, textarea, mediaBtn, onSend
     stopStream();
     cleanup();
 
-    if (dur < 0.5) return;
+    if (dur < 0.5) return; // too short — discard
 
     const mime = chunks[0]?.type || mimeType || 'audio/webm';
     const blob = new Blob(chunks, { type: mime });
@@ -91,8 +125,8 @@ export async function startVoiceRecording(composerEl, textarea, mediaBtn, onSend
     }
   }
 
-  // Listen for mouseup/touchend on the whole document to detect release
-  function onRelease(e) {
+  /* Release (mouseup / touchend) anywhere → send */
+  function onRelease() {
     document.removeEventListener('mouseup', onRelease);
     document.removeEventListener('touchend', onRelease);
     finish();
@@ -103,6 +137,14 @@ export async function startVoiceRecording(composerEl, textarea, mediaBtn, onSend
 
 function iconX() {
   return `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-    <line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/>
+    <line x1="3" y1="3" x2="13" y2="13"/>
+    <line x1="13" y1="3" x2="3" y2="13"/>
+  </svg>`;
+}
+
+function iconArrowLeft() {
+  return `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="12" y1="7" x2="2" y2="7"/>
+    <polyline points="6 3 2 7 6 11"/>
   </svg>`;
 }
