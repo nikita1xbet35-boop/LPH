@@ -12,6 +12,7 @@ export interface User {
   password_hash: string;
   display_name: string | null;
   public_key: string | null;
+  encrypted_private_key: string | null;
   created_at: number;
   last_seen: number | null;
 }

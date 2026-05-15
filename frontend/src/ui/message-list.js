@@ -3,19 +3,9 @@ import { formatTime, formatDate } from '../lib/utils.js';
 import { api } from '../lib/api.js';
 import { decryptMessage, importPublicKey } from '../lib/crypto.js';
 
-function applyWatermark(el) {
-  const name = state.user?.display_name || state.user?.username || '';
-  if (!name) return;
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='220' height='160'><text x='50%' y='50%' font-family='Inter,system-ui,sans-serif' font-size='13' fill='rgba(255,255,255,0.045)' text-anchor='middle' dominant-baseline='middle' transform='rotate(-25 110 80)'>${name.replace(/[<>&'"]/g, '')}</text></svg>`;
-  el.style.backgroundImage = `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
-  el.style.backgroundRepeat = 'repeat';
-  el.style.backgroundSize = '220px 160px';
-}
-
 export function renderMessageList(convId, isGroup) {
   const container = document.createElement('div');
   container.className = 'message-list';
-  applyWatermark(container);
 
   async function render() {
     const msgs = (state.messages[convId] || []).slice().reverse();
@@ -50,17 +40,23 @@ export function renderMessageList(convId, isGroup) {
         container.appendChild(sep);
       }
 
-      // Расшифровываем если есть nonce и ключ
       let displayContent = msg.content;
       let decrypted = false;
+      let decryptFailed = false;
+
       if (msg.nonce && theirPublicKey && state.myKeyPair && !msg._decrypted) {
-        displayContent = await decryptMessage(msg.content, msg.nonce, state.myKeyPair.privateKey, theirPublicKey);
-        decrypted = true;
+        const result = await decryptMessage(msg.content, msg.nonce, state.myKeyPair.privateKey, theirPublicKey);
+        if (result !== null) {
+          displayContent = result;
+          decrypted = true;
+        } else {
+          decryptFailed = true;
+        }
       } else if (msg._decrypted) {
         decrypted = true;
       }
 
-      container.appendChild(renderBubble({ ...msg, content: displayContent }, decrypted || !!msg.nonce, isGroup));
+      container.appendChild(renderBubble({ ...msg, content: displayContent }, decrypted || !!msg.nonce, isGroup, decryptFailed));
     }
 
     container.scrollTop = container.scrollHeight;
@@ -74,7 +70,7 @@ export function renderMessageList(convId, isGroup) {
   return container;
 }
 
-function renderBubble(msg, isEncrypted, isGroup) {
+function renderBubble(msg, isEncrypted, isGroup, decryptFailed) {
   const isOwn = msg.sender_id === state.user?.id;
   const wrap = document.createElement('div');
   wrap.className = 'message-wrap ' + (isOwn ? 'own' : 'other');
@@ -87,13 +83,19 @@ function renderBubble(msg, isEncrypted, isGroup) {
   }
 
   const bubble = document.createElement('div');
-  bubble.className = `message-bubble ${isOwn ? 'own' : 'other'}${msg.status === 'pending' ? ' pending' : ''}${msg.status === 'failed' ? ' failed' : ''}`;
-  bubble.textContent = msg.content;
+  bubble.className = `message-bubble ${isOwn ? 'own' : 'other'}${msg.status === 'pending' ? ' pending' : ''}${msg.status === 'failed' ? ' failed' : ''}${decryptFailed ? ' decrypt-failed' : ''}`;
+
+  if (decryptFailed) {
+    bubble.innerHTML = `<span style="opacity:0.5">🔒</span>`;
+  } else {
+    bubble.textContent = msg.content;
+  }
+
   wrap.appendChild(bubble);
 
   const meta = document.createElement('div');
   meta.className = 'message-time';
-  meta.textContent = formatTime(msg.created_at) + (isEncrypted ? ' 🔒' : '');
+  meta.textContent = formatTime(msg.created_at) + (isEncrypted && !decryptFailed ? ' 🔒' : '');
   wrap.appendChild(meta);
 
   if (!isOwn && msg.id && !msg.id.startsWith('tmp_')) {

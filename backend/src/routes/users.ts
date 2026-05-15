@@ -14,7 +14,7 @@ export async function handleUsers(request: Request, env: Env, path: string): Pro
     }
 
     if (path === '/api/users/me' && request.method === 'PATCH') {
-      let body: { display_name?: string; public_key?: string };
+      let body: { display_name?: string; public_key?: string; encrypted_private_key?: string };
       try { body = await request.json(); } catch { return err('bad_request', 'Invalid JSON', 400, env, request); }
 
       if (body.display_name !== undefined) {
@@ -24,6 +24,10 @@ export async function handleUsers(request: Request, env: Env, path: string): Pro
       if (body.public_key !== undefined) {
         await env.DB.prepare('UPDATE users SET public_key = ? WHERE id = ?')
           .bind(body.public_key, ctx.user.id).run();
+      }
+      if (body.encrypted_private_key !== undefined) {
+        await env.DB.prepare('UPDATE users SET encrypted_private_key = ? WHERE id = ?')
+          .bind(body.encrypted_private_key, ctx.user.id).run();
       }
 
       const updated = await env.DB.prepare('SELECT * FROM users WHERE id = ?')

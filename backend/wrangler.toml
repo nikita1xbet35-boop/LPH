@@ -8,6 +8,7 @@ account_id = "71b0e14ca51602c50c338294d5db1d8c"
 binding = "DB"
 database_name = "messenger"
 database_id = "a9b891f2-b3ec-4ef8-bc46-e3e04e8bad97"
+migrations_dir = "migrations"
 
 [[durable_objects.bindings]]
 name = "CHAT_ROOM"

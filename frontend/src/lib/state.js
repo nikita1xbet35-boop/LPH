@@ -5,7 +5,7 @@ function notify(key) {
 }
 
 export const state = new Proxy(
-  { user: null, conversations: [], activeConvId: null, messages: {}, onlineUsers: new Set(), myKeyPair: null, publicKeys: {} },
+  { user: null, conversations: [], activeConvId: null, messages: {}, onlineUsers: new Set(), myKeyPair: null, publicKeys: {}, keyEncryptionKey: null },
   {
     set(obj, key, val) {
       obj[key] = val;

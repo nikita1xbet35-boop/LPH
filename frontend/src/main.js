@@ -5,23 +5,28 @@ import { loadOrCreateKeyPair } from './lib/crypto.js';
 import { renderLogin } from './ui/login-view.js';
 import { renderChat } from './ui/chat-view.js';
 import { renderAdmin } from './ui/admin-view.js';
+import { initScreenGuard } from './lib/screen-guard.js';
 
 // Service Worker
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(() => {});
 }
 
+initScreenGuard();
+
 const app = document.getElementById('app');
 let currentView = null;
 
 async function initKeys(user) {
   if (state.myKeyPair) return;
-  const keyPair = await loadOrCreateKeyPair(user.id);
+  const kek = state.keyEncryptionKey;
+  const keyPair = await loadOrCreateKeyPair(
+    user.id,
+    user,
+    kek,
+    (patch) => api.patch('/users/me', patch).catch(() => {})
+  );
   state.myKeyPair = keyPair;
-  // Загружаем публичный ключ на сервер если новый или его нет у юзера
-  if (keyPair.isNew || !user.public_key) {
-    await api.patch('/users/me', { public_key: keyPair.publicKeyB64 }).catch(() => {});
-  }
 }
 
 async function route() {

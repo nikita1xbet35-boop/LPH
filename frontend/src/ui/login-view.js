@@ -1,6 +1,7 @@
 import { api } from '../lib/api.js';
 import { storage } from '../lib/storage.js';
 import { state } from '../lib/state.js';
+import { deriveKEK } from '../lib/crypto.js';
 
 export function renderLogin() {
   const wrap = document.createElement('div');
@@ -29,12 +30,15 @@ export function renderLogin() {
     btn.textContent = '...';
 
     try {
+      const password = form.password.value;
       const data = await api.post('/auth/login', {
         username: form.username.value.trim(),
-        password: form.password.value,
+        password,
       });
       storage.set('token', data.token);
       state.user = data.user;
+      // Derive KEK from password — used to encrypt/decrypt private key on server
+      state.keyEncryptionKey = await deriveKEK(password, data.user.id);
       location.hash = '#/chat';
     } catch (err) {
       errorEl.textContent = err.message;
