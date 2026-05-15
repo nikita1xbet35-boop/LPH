@@ -1,12 +1,33 @@
 import { state } from './lib/state.js';
 import { storage } from './lib/storage.js';
 import { api } from './lib/api.js';
+import { loadOrCreateKeyPair } from './lib/crypto.js';
 import { renderLogin } from './ui/login-view.js';
 import { renderChat } from './ui/chat-view.js';
 import { renderAdmin } from './ui/admin-view.js';
+import { initScreenGuard } from './lib/screen-guard.js';
+import { initPush } from './lib/push.js';
+
+// Service Worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+
+initScreenGuard();
 
 const app = document.getElementById('app');
 let currentView = null;
+
+async function initKeys(user) {
+  if (state.myKeyPair) return;
+  const keyPair = await loadOrCreateKeyPair(
+    user.id,
+    user,
+    state.keyEncryptionKey,
+    (patch) => api.patch('/users/me', patch).catch(() => {})
+  );
+  state.myKeyPair = keyPair;
+}
 
 async function route() {
   const hash = location.hash || '#/login';
@@ -19,6 +40,12 @@ async function route() {
     } catch {
       storage.remove('token');
     }
+  }
+
+  // Инициализируем ключи если залогинены
+  if (state.user) {
+    await initKeys(state.user);
+    initPush(); // fire and forget
   }
 
   // Редиректы
@@ -42,7 +69,6 @@ async function route() {
     currentView = await renderAdmin();
     app.appendChild(currentView);
   } else {
-    // #/chat или #/chat/:id
     currentView = await renderChat();
     app.appendChild(currentView);
   }

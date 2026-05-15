@@ -6,6 +6,8 @@ import { handleUsers } from './routes/users';
 import { handleConversations } from './routes/conversations';
 import { handleMessages } from './routes/messages';
 import { handleAdmin } from './routes/admin';
+import { handleSetup } from './routes/setup';
+import { handlePush } from './routes/push';
 
 export { ChatRoom } from './durable/ChatRoom';
 
@@ -24,19 +26,26 @@ export default {
 
     let response: Response;
 
-    if (path.startsWith('/api/auth/')) {
+    if (path === '/api/setup/init') {
+      response = await handleSetup(request, env);
+    } else if (path.startsWith('/api/auth/')) {
       response = await handleAuth(request, env, path);
     } else if (path.startsWith('/api/admin/')) {
       response = await handleAdmin(request, env, path);
     } else if (path.startsWith('/api/users')) {
       response = await handleUsers(request, env, path);
     } else if (path.startsWith('/api/conversations') || path.startsWith('/api/messages')) {
-      // Роутим сообщения и разговоры вместе
-      if (path.match(/^\/api\/conversations\/[^/]+\/messages/) || path.startsWith('/api/messages')) {
+      const isConvMessages = path.match(/^\/api\/conversations\/[^/]+\/messages/);
+      // GET сообщений — в handleConversations, POST/DELETE/read — в handleMessages
+      if (isConvMessages && request.method !== 'GET') {
+        response = await handleMessages(request, env, path);
+      } else if (path.startsWith('/api/messages')) {
         response = await handleMessages(request, env, path);
       } else {
         response = await handleConversations(request, env, path);
       }
+    } else if (path.startsWith('/api/push')) {
+      response = await handlePush(request, env, path);
     } else {
       response = err('not_found', 'Not found', 404, env, request);
     }

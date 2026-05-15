@@ -1,39 +1,35 @@
 :root {
-  --bg-0: #0a0a0a;
-  --bg-1: #111111;
-  --bg-2: #1a1a1a;
-  --bg-3: #232323;
+  /* ── Telegram Dark Palette ── */
+  --bg: #0f1621;
+  --sidebar-bg: #17212b;
+  --header-bg: #17212b;
+  --input-bg: #17212b;
+  --msg-out: #2b5278;
+  --msg-in: #182533;
+  --accent: #5288c1;
+  --accent-hover: #4a7ab5;
+  --text-primary: #e8eaed;
+  --text-secondary: #7d9db5;
+  --text-meta: #6b8da8;
+  --online: #4dcd5e;
+  --danger: #e53935;
+  --border: rgba(255,255,255,0.06);
+  --hover: rgba(255,255,255,0.05);
+  --active-conv: rgba(82,136,193,0.15);
 
-  --border: #1f1f1f;
-  --border-strong: #2a2a2a;
-
-  --text-0: #ededed;
-  --text-1: #a0a0a0;
-  --text-2: #6b6b6b;
-
-  --accent: #d4d4d4;
-  --accent-fg: #0a0a0a;
-
-  --danger: #e85d5d;
-  --success: #5db075;
-
-  --font: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
-
+  /* ── Typography ── */
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   --fs-xs: 11px;
-  --fs-sm: 13px;
+  --fs-sm: 12px;
   --fs-base: 14px;
   --fs-md: 15px;
   --fs-lg: 17px;
-  --fs-xl: 22px;
-
   --fw-regular: 400;
   --fw-medium: 500;
   --fw-semibold: 600;
-
-  --lh-tight: 1.3;
   --lh-base: 1.5;
 
+  /* ── Spacing ── */
   --sp-1: 4px;
   --sp-2: 8px;
   --sp-3: 12px;
@@ -41,12 +37,21 @@
   --sp-5: 20px;
   --sp-6: 24px;
   --sp-8: 32px;
-  --sp-10: 40px;
 
+  /* ── Radii ── */
   --r-sm: 4px;
   --r-md: 8px;
   --r-lg: 12px;
+  --r-xl: 18px;
+  --r-bubble: 18px;
+  --r-bubble-sm: 6px;
 
-  --t-fast: 120ms ease;
-  --t-base: 180ms ease;
+  /* ── Transitions ── */
+  --t-fast: 150ms ease;
+  --t-base: 200ms ease;
+
+  /* ── Layout ── */
+  --sidebar-w: 320px;
+  --header-h: 56px;
+  --composer-min-h: 56px;
 }

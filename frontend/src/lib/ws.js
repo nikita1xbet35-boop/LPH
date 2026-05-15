@@ -41,8 +41,11 @@ function _connect() {
   const token = storage.get('token');
   if (!token || !convId) return;
 
-  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const url = `${proto}//${location.host}/ws?token=${encodeURIComponent(token)}&conversation_id=${convId}`;
+  const apiBase = import.meta.env.VITE_API_BASE || '';
+  const wsBase = apiBase
+    ? apiBase.replace(/^https?/, (m) => (m === 'https' ? 'wss' : 'ws'))
+    : `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}`;
+  const url = `${wsBase}/ws?token=${encodeURIComponent(token)}&conversation_id=${convId}`;
   socket = new WebSocket(url);
 
   socket.addEventListener('open', () => {

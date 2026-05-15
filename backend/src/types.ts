@@ -4,6 +4,9 @@ export interface Env {
   JWT_SECRET: string;
   ADMIN_USERNAME: string;
   ALLOWED_ORIGIN?: string;
+  VAPID_PUBLIC_KEY?: string;
+  VAPID_PRIVATE_KEY_JWK?: string;
+  VAPID_CONTACT?: string;
 }
 
 export interface User {
@@ -12,6 +15,7 @@ export interface User {
   password_hash: string;
   display_name: string | null;
   public_key: string | null;
+  encrypted_private_key: string | null;
   created_at: number;
   last_seen: number | null;
 }
