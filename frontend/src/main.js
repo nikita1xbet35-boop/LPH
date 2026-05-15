@@ -19,11 +19,10 @@ let currentView = null;
 
 async function initKeys(user) {
   if (state.myKeyPair) return;
-  const kek = state.keyEncryptionKey;
   const keyPair = await loadOrCreateKeyPair(
     user.id,
     user,
-    kek,
+    state.keyEncryptionKey,
     (patch) => api.patch('/users/me', patch).catch(() => {})
   );
   state.myKeyPair = keyPair;

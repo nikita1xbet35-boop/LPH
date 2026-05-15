@@ -1,7 +1,7 @@
 import { api } from '../lib/api.js';
 import { state } from '../lib/state.js';
 import { sendWs } from '../lib/ws.js';
-import { encryptMessage, importPublicKey } from '../lib/crypto.js';
+import { encryptMessage, importPublicKeyField } from '../lib/crypto.js';
 
 export function renderComposer(convId) {
   const wrap = document.createElement('div');
@@ -86,7 +86,8 @@ async function buildMessageBody(content, convId) {
   if (!other?.public_key) return { content };
 
   try {
-    const theirPublicKey = await importPublicKey(other.public_key);
+    const theirPublicKey = await importPublicKeyField(other.public_key);
+    if (!theirPublicKey) return { content };
     const encrypted = await encryptMessage(content, myKeyPair.privateKey, theirPublicKey);
     return { content: encrypted.content, nonce: encrypted.nonce };
   } catch {

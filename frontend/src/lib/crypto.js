@@ -26,7 +26,26 @@ export async function importPrivateKey(b64str) {
   return crypto.subtle.importKey('pkcs8', raw, CURVE, true, ['deriveKey']);
 }
 
-// --- Key Encryption Key (KEK) — derived from password, used to protect private key on server ---
+// public_key field in DB stores: "pubKeyB64||iv.encryptedPrivB64"
+// This lets us store the encrypted private key without a schema change.
+export function packKeyField(pubB64, encB64) {
+  return encB64 ? `${pubB64}||${encB64}` : pubB64;
+}
+export function unpackKeyField(value) {
+  if (!value) return { pub: null, enc: null };
+  const idx = value.indexOf('||');
+  if (idx === -1) return { pub: value, enc: null };
+  return { pub: value.slice(0, idx), enc: value.slice(idx + 2) };
+}
+
+// Import only the public part of a (possibly packed) key field
+export async function importPublicKeyField(keyField) {
+  const { pub } = unpackKeyField(keyField);
+  if (!pub) return null;
+  return importPublicKey(pub);
+}
+
+// --- KEK: password-derived key used to encrypt the ECDH private key ---
 
 export async function deriveKEK(password, userId) {
   const enc = new TextEncoder();
@@ -41,14 +60,14 @@ export async function deriveKEK(password, userId) {
   );
 }
 
-export async function encryptPrivateKey(privateKey, kek) {
+async function encryptPrivateKey(privateKey, kek) {
   const raw = await crypto.subtle.exportKey('pkcs8', privateKey);
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, kek, raw);
   return b64(iv) + '.' + b64(new Uint8Array(ct));
 }
 
-export async function decryptPrivateKey(encrypted, kek) {
+async function decryptPrivateKey(encrypted, kek) {
   const [ivB64, ctB64] = encrypted.split('.');
   const raw = await crypto.subtle.decrypt(
     { name: 'AES-GCM', iv: unb64(ivB64) },
@@ -58,48 +77,54 @@ export async function decryptPrivateKey(encrypted, kek) {
   return crypto.subtle.importKey('pkcs8', raw, CURVE, true, ['deriveKey']);
 }
 
-// --- Load or create key pair, syncing with server via encrypted backup ---
+// --- Load or create key pair ---
+// Encrypted private key is stored packed into the public_key field ("pub||enc")
+// so no DB migration is needed.
 
 export async function loadOrCreateKeyPair(userId, user, kek, patchFn) {
-  // 1. If server has encrypted private key and we have KEK, restore from server
-  if (user.encrypted_private_key && kek) {
+  const { pub: serverPub, enc: serverEnc } = unpackKeyField(user?.public_key);
+
+  // 1. Restore from server-stored encrypted private key (works cross-device)
+  if (serverEnc && serverPub && kek) {
     try {
-      const privateKey = await decryptPrivateKey(user.encrypted_private_key, kek);
-      const publicKey = await importPublicKey(user.public_key);
-      // Cache locally
+      const privateKey = await decryptPrivateKey(serverEnc, kek);
+      const publicKey = await importPublicKey(serverPub);
       const privB64 = await exportPrivateKey(privateKey);
-      localStorage.setItem(`e2e_pub_${userId}`, user.public_key);
+      localStorage.setItem(`e2e_pub_${userId}`, serverPub);
       localStorage.setItem(`e2e_priv_${userId}`, privB64);
-      return { publicKey, privateKey, publicKeyB64: user.public_key, isNew: false };
+      return { publicKey, privateKey, publicKeyB64: serverPub, isNew: false };
     } catch {}
   }
 
-  // 2. Try localStorage (same browser/device)
+  // 2. Same browser — restore from localStorage
   const storedPub = localStorage.getItem(`e2e_pub_${userId}`);
   const storedPriv = localStorage.getItem(`e2e_priv_${userId}`);
   if (storedPub && storedPriv) {
     try {
       const publicKey = await importPublicKey(storedPub);
       const privateKey = await importPrivateKey(storedPriv);
-      // If we have KEK but no server backup yet, upload it now
-      if (kek && !user.encrypted_private_key) {
-        const encrypted = await encryptPrivateKey(privateKey, kek);
-        patchFn?.({ public_key: storedPub, encrypted_private_key: encrypted });
+      // Upload encrypted backup if we have KEK and server doesn't have enc yet
+      if (kek && !serverEnc) {
+        const enc = await encryptPrivateKey(privateKey, kek);
+        patchFn?.({ public_key: packKeyField(storedPub, enc) });
       }
       return { publicKey, privateKey, publicKeyB64: storedPub, isNew: false };
     } catch {}
   }
 
-  // 3. Generate fresh key pair
+  // 3. Fresh key pair
   const pair = await generateKeyPair();
   const publicKeyB64 = await exportPublicKey(pair.publicKey);
   const privateKeyB64 = await exportPrivateKey(pair.privateKey);
   localStorage.setItem(`e2e_pub_${userId}`, publicKeyB64);
   localStorage.setItem(`e2e_priv_${userId}`, privateKeyB64);
 
-  const patch = { public_key: publicKeyB64 };
-  if (kek) patch.encrypted_private_key = await encryptPrivateKey(pair.privateKey, kek);
-  patchFn?.(patch);
+  let packedPub = publicKeyB64;
+  if (kek) {
+    const enc = await encryptPrivateKey(pair.privateKey, kek);
+    packedPub = packKeyField(publicKeyB64, enc);
+  }
+  patchFn?.({ public_key: packedPub });
 
   return { ...pair, publicKeyB64, isNew: true };
 }

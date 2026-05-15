@@ -1,7 +1,7 @@
 import { state, on, off } from '../lib/state.js';
 import { formatTime, formatDate } from '../lib/utils.js';
 import { api } from '../lib/api.js';
-import { decryptMessage, importPublicKey } from '../lib/crypto.js';
+import { decryptMessage, importPublicKeyField } from '../lib/crypto.js';
 
 export function renderMessageList(convId, isGroup) {
   const container = document.createElement('div');
@@ -25,7 +25,7 @@ export function renderMessageList(convId, isGroup) {
       const conv = state.conversations.find(c => c.id === convId);
       const other = conv?.members?.find(m => m.id !== state.user?.id);
       if (other?.public_key) {
-        try { theirPublicKey = await importPublicKey(other.public_key); } catch {}
+        try { theirPublicKey = await importPublicKeyField(other.public_key); } catch {}
       }
     }
 
