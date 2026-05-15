@@ -7,6 +7,7 @@ import { handleConversations } from './routes/conversations';
 import { handleMessages } from './routes/messages';
 import { handleAdmin } from './routes/admin';
 import { handleSetup } from './routes/setup';
+import { handlePush } from './routes/push';
 
 export { ChatRoom } from './durable/ChatRoom';
 
@@ -43,6 +44,8 @@ export default {
       } else {
         response = await handleConversations(request, env, path);
       }
+    } else if (path.startsWith('/api/push')) {
+      response = await handlePush(request, env, path);
     } else {
       response = err('not_found', 'Not found', 404, env, request);
     }

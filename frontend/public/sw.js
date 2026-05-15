@@ -15,7 +15,6 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
-  // Только GET, не трогаем API и WebSocket
   if (e.request.method !== 'GET') return;
   if (e.request.url.includes('/api/') || e.request.url.includes('/ws')) return;
 
@@ -29,3 +28,40 @@ self.addEventListener('fetch', (e) => {
       .catch(() => caches.match(e.request))
   );
 });
+
+self.addEventListener('push', (e) => {
+  const data = e.data?.json() ?? {};
+
+  e.waitUntil((async () => {
+    // Don't show notification if user has the app open and visible
+    const allClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    if (allClients.some(c => c.visibilityState === 'visible')) return;
+
+    await self.registration.showNotification(data.title || 'New message', {
+      body: data.body || '',
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      tag: 'chat-msg',
+      renotify: true,
+      vibrate: [100, 50, 100],
+      data: { url: data.url || '/#/chat' },
+    });
+  })());
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = e.notification.data?.url || '/#/chat';
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
+      const existing = clients.find(c => c.url.includes(self.location.origin));
+      if (existing) {
+        existing.focus();
+        existing.navigate(url);
+      } else {
+        self.clients.openWindow(url);
+      }
+    })
+  );
+});
+

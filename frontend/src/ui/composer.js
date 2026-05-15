@@ -65,11 +65,13 @@ export function renderComposer(convId) {
   // Cam mode: short tap → open video recorder; long press 600ms → switch back to mic
   let holdTimer = null;
   let didHold = false;
+  let isTouchEvent = false;
   let justSwitchedToCam = false;
 
   function onMediaDown(e) {
     e.preventDefault();
     didHold = false;
+    isTouchEvent = e.type === 'touchstart';
     const delay = mediaMode === 'mic' ? 280 : 600;
     holdTimer = setTimeout(() => {
       didHold = true;
@@ -84,20 +86,20 @@ export function renderComposer(convId) {
   function onMediaUp(e) {
     e.preventDefault();
     clearTimeout(holdTimer);
-    if (!didHold && mediaMode === 'mic') {
+    if (didHold) return;
+    if (mediaMode === 'mic') {
       justSwitchedToCam = true;
       setMode('cam');
+      if (isTouchEvent) justSwitchedToCam = false; // no click fires after touch preventDefault
+    } else if (isTouchEvent) {
+      openVideoRecorder(onSendMedia); // touch: click won't fire, open here
     }
+    // mouse + cam mode: handled by click event
   }
 
   function onMediaClick(e) {
-    if (justSwitchedToCam) {
-      justSwitchedToCam = false;
-      return; // Same click that switched mic→cam, don't open recorder yet
-    }
-    if (mediaMode === 'cam' && !didHold) {
-      openVideoRecorder(onSendMedia);
-    }
+    if (justSwitchedToCam) { justSwitchedToCam = false; return; }
+    if (mediaMode === 'cam' && !didHold) openVideoRecorder(onSendMedia);
   }
 
   mediaBtn.addEventListener('mousedown', onMediaDown);

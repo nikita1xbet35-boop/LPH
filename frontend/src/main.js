@@ -6,6 +6,7 @@ import { renderLogin } from './ui/login-view.js';
 import { renderChat } from './ui/chat-view.js';
 import { renderAdmin } from './ui/admin-view.js';
 import { initScreenGuard } from './lib/screen-guard.js';
+import { initPush } from './lib/push.js';
 
 // Service Worker
 if ('serviceWorker' in navigator) {
@@ -42,7 +43,10 @@ async function route() {
   }
 
   // Инициализируем ключи если залогинены
-  if (state.user) await initKeys(state.user);
+  if (state.user) {
+    await initKeys(state.user);
+    initPush(); // fire and forget
+  }
 
   // Редиректы
   if (!state.user && hash !== '#/login') {

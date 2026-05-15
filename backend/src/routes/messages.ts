@@ -2,6 +2,7 @@ import type { Env, Message } from '../types';
 import { json, err } from '../lib/cors';
 import { requireAuth, AuthError } from '../lib/db';
 import { nanoid } from '../lib/nanoid';
+import { sendWebPush, type PushSubscriptionRecord } from '../lib/webpush';
 
 export async function handleMessages(request: Request, env: Env, path: string): Promise<Response> {
   try {
@@ -39,6 +40,36 @@ export async function handleMessages(request: Request, env: Env, path: string): 
         });
       } catch (e) {
         console.error('Broadcast error:', e);
+      }
+
+      // Push notifications to offline members
+      if (env.VAPID_PRIVATE_KEY_JWK && env.VAPID_CONTACT) {
+        try {
+          const members = await env.DB.prepare(
+            'SELECT user_id FROM conversation_members WHERE conversation_id = ? AND user_id != ?'
+          ).bind(convId, ctx.user.id).all<{ user_id: string }>();
+
+          const senderName = ctx.user.display_name || ctx.user.username;
+          const preview = body.content?.startsWith('{"t":"audio"') ? '🎤 Voice message'
+            : body.content?.startsWith('{"t":"video"') ? '🎥 Video circle'
+            : body.nonce ? '🔒 Encrypted message'
+            : (body.content ?? '').substring(0, 80);
+
+          const pushPromises: Promise<void>[] = [];
+          for (const { user_id } of members.results) {
+            const subs = await env.DB.prepare(
+              'SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = ?'
+            ).bind(user_id).all<PushSubscriptionRecord>().catch(() => ({ results: [] }));
+
+            for (const sub of subs.results) {
+              pushPromises.push(
+                sendWebPush(sub, { title: senderName, body: preview, url: '/#/chat' },
+                  env.VAPID_PRIVATE_KEY_JWK!, env.VAPID_CONTACT!).catch(() => {})
+              );
+            }
+          }
+          await Promise.allSettled(pushPromises);
+        } catch {}
       }
 
       return json({ message }, 201, env, request);
