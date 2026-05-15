@@ -1,8 +1,15 @@
-import { api } from '../lib/api.js';
-
 function getSupportedAudioType() {
   const types = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'];
   return types.find(t => MediaRecorder.isTypeSupported(t)) || '';
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
 }
 
 export function attachVoiceRecorder(composerEl, onSendMedia) {
@@ -13,7 +20,6 @@ export function attachVoiceRecorder(composerEl, onSendMedia) {
   micBtn.title = 'Voice message';
   micBtn.innerHTML = iconMic();
 
-  // Insert mic before the send button
   const sendBtn = composerEl.querySelector('.btn-icon:last-child');
   composerEl.insertBefore(micBtn, sendBtn);
 
@@ -23,7 +29,6 @@ export function attachVoiceRecorder(composerEl, onSendMedia) {
   let startTime = 0;
   let stream = null;
 
-  // Recording overlay inside composer
   const recBar = document.createElement('div');
   recBar.className = 'rec-bar';
   recBar.style.display = 'none';
@@ -69,6 +74,7 @@ export function attachVoiceRecorder(composerEl, onSendMedia) {
       const s = Math.floor((Date.now() - startTime) / 1000);
       recBar.querySelector('.rec-timer').textContent =
         `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+      if (s >= 120) sendRecording(); // 2 min max
     }, 500);
   }
 
@@ -86,27 +92,30 @@ export function attachVoiceRecorder(composerEl, onSendMedia) {
 
   async function sendRecording() {
     if (!recorder) return;
-    recorder.stop();
-    await new Promise(r => { recorder.onstop = r; });
+    const rec = recorder;
+    recorder = null;
+    rec.stop();
+    await new Promise(r => { rec.onstop = r; });
     stopStream();
 
     const dur = (Date.now() - startTime) / 1000;
-    if (dur < 0.5) { hideRecording(); return; }
-
-    const mimeType = chunks[0]?.type || getSupportedAudioType();
-    const blob = new Blob(chunks, { type: mimeType });
     hideRecording();
+    if (dur < 0.5) return;
 
-    const form = new FormData();
-    form.append('file', blob, 'voice.' + (mimeType.includes('mp4') ? 'm4a' : 'webm'));
+    const mimeType = chunks[0]?.type || getSupportedAudioType() || 'audio/webm';
+    const blob = new Blob(chunks, { type: mimeType });
+
+    if (blob.size > 3 * 1024 * 1024) {
+      alert('Recording too long (max ~2 min)');
+      return;
+    }
 
     try {
-      const { url } = await api.upload(form);
-      onSendMedia({ t: 'audio', url, dur: Math.round(dur) });
+      const data = await blobToBase64(blob);
+      onSendMedia({ t: 'audio', data, mime: mimeType, dur: Math.round(dur) });
     } catch (e) {
-      alert('Upload failed: ' + e.message);
+      alert('Failed to encode audio: ' + e.message);
     }
-    recorder = null;
   }
 
   micBtn.addEventListener('click', startRecording);
@@ -120,7 +129,6 @@ function iconMic() {
     <path d="M3 9a6 6 0 0 0 12 0"/><line x1="9" y1="15" x2="9" y2="17"/><line x1="6" y1="17" x2="12" y2="17"/>
   </svg>`;
 }
-
 function iconX() {
   return `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
     <line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/>

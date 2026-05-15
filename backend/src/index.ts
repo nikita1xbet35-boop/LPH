@@ -7,7 +7,6 @@ import { handleConversations } from './routes/conversations';
 import { handleMessages } from './routes/messages';
 import { handleAdmin } from './routes/admin';
 import { handleSetup } from './routes/setup';
-import { handleUpload } from './routes/upload';
 
 export { ChatRoom } from './durable/ChatRoom';
 
@@ -28,10 +27,6 @@ export default {
 
     if (path === '/api/setup/init') {
       response = await handleSetup(request, env);
-    } else if (path.startsWith('/api/upload')) {
-      response = await handleUpload(request, env, path);
-    } else if (path.startsWith('/api/media/')) {
-      response = await handleUpload(request, env, path);
     } else if (path.startsWith('/api/auth/')) {
       response = await handleAuth(request, env, path);
     } else if (path.startsWith('/api/admin/')) {

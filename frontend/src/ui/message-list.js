@@ -1,6 +1,6 @@
 import { state, on, off } from '../lib/state.js';
 import { formatTime, formatDate } from '../lib/utils.js';
-import { api, mediaUrl } from '../lib/api.js';
+import { api } from '../lib/api.js';
 import { decryptMessage, importPublicKeyField } from '../lib/crypto.js';
 
 export function renderMessageList(convId, isGroup) {
@@ -102,7 +102,8 @@ function renderAudioBubble(media, isOwn) {
 
   wrap.append(playBtn, progress, dur);
 
-  const audio = new Audio(mediaUrl(media.url));
+  const src = `data:${media.mime || 'audio/webm'};base64,${media.data}`;
+  const audio = new Audio(src);
   let playing = false;
 
   audio.addEventListener('timeupdate', () => {
@@ -146,7 +147,7 @@ function renderVideoBubble(media) {
   circle.className = 'media-video-circle';
 
   const video = document.createElement('video');
-  video.src = mediaUrl(media.url);
+  video.src = `data:${media.mime || 'video/webm'};base64,${media.data}`;
   video.playsInline = true;
   video.setAttribute('webkit-playsinline', '');
   video.loop = true;
