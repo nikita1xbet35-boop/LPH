@@ -2,7 +2,7 @@ name: Deploy
 
 on:
   push:
-    branches: [main]
+    branches: [main, claude/install-nodejs-20-5ql2f]
 
 jobs:
   deploy-backend:
