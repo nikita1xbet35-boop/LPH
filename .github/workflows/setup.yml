@@ -29,8 +29,13 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
+      - name: Install backend deps
+        working-directory: backend
+        run: npm install
+
       - name: Create admin user
-        run: node backend/scripts/create-admin.mjs
+        working-directory: backend
+        run: node scripts/create-admin.mjs
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           ADMIN_PASSWORD: ${{ inputs.admin_password }}
