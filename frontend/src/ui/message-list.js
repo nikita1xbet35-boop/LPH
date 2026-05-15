@@ -82,6 +82,18 @@ function fmtDur(s) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
+// Seeded pseudo-random waveform — same seed (duration) → same bars every render
+function makeWaveBars(dur, count = 30) {
+  let s = (dur || 1) * 1000;
+  const bars = [];
+  for (let i = 0; i < count; i++) {
+    s = (s * 1664525 + 1013904223) & 0xffffffff;
+    const h = 3 + ((s >>> 0) % 26); // 3–28px
+    bars.push(h);
+  }
+  return bars;
+}
+
 function renderAudioBubble(media, isOwn) {
   const wrap = document.createElement('div');
   wrap.className = `media-audio ${isOwn ? 'own' : 'other'}`;
@@ -90,38 +102,52 @@ function renderAudioBubble(media, isOwn) {
   playBtn.className = 'media-play-btn';
   playBtn.innerHTML = iconPlay();
 
-  const progress = document.createElement('div');
-  progress.className = 'media-progress';
-  const fill = document.createElement('div');
-  fill.className = 'media-progress-fill';
-  progress.appendChild(fill);
+  const BAR_COUNT = 30;
+  const heights = makeWaveBars(media.dur, BAR_COUNT);
+
+  const waveform = document.createElement('div');
+  waveform.className = 'waveform';
+  const barEls = heights.map(h => {
+    const b = document.createElement('div');
+    b.className = 'wave-bar';
+    b.style.height = h + 'px';
+    waveform.appendChild(b);
+    return b;
+  });
 
   const dur = document.createElement('span');
   dur.className = 'media-dur';
   dur.textContent = fmtDur(media.dur || 0);
 
-  wrap.append(playBtn, progress, dur);
+  wrap.append(playBtn, waveform, dur);
 
   const src = `data:${media.mime || 'audio/webm'};base64,${media.data}`;
   const audio = new Audio(src);
   let playing = false;
 
-  audio.addEventListener('timeupdate', () => {
+  const playedClass = isOwn ? 'played' : 'other-played';
+
+  function updateWave() {
     if (!audio.duration) return;
-    fill.style.width = (audio.currentTime / audio.duration * 100) + '%';
+    const pct = audio.currentTime / audio.duration;
+    const filled = Math.round(pct * BAR_COUNT);
+    barEls.forEach((b, i) => b.classList.toggle(playedClass, i < filled));
     dur.textContent = fmtDur(Math.floor(audio.duration - audio.currentTime));
-  });
+  }
+
+  audio.addEventListener('timeupdate', updateWave);
   audio.addEventListener('ended', () => {
     playing = false;
     playBtn.innerHTML = iconPlay();
-    fill.style.width = '0';
+    barEls.forEach(b => b.classList.remove(playedClass));
     dur.textContent = fmtDur(media.dur || 0);
   });
 
-  progress.addEventListener('click', (e) => {
+  waveform.addEventListener('click', (e) => {
     if (!audio.duration) return;
-    const rect = progress.getBoundingClientRect();
-    audio.currentTime = (e.clientX - rect.left) / rect.width * audio.duration;
+    const rect = waveform.getBoundingClientRect();
+    audio.currentTime = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) * audio.duration;
+    updateWave();
   });
 
   playBtn.addEventListener('click', () => {

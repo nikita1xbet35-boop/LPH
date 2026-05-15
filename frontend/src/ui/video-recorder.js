@@ -14,18 +14,9 @@ function blobToBase64(blob) {
 
 const MAX_SEC = 15;
 
-export function attachVideoRecorder(composerEl, onSendMedia) {
+export function openVideoRecorder(onSendMedia) {
   if (!navigator.mediaDevices?.getUserMedia) return;
-
-  const camBtn = document.createElement('button');
-  camBtn.className = 'btn-icon composer-cam';
-  camBtn.title = 'Video circle';
-  camBtn.innerHTML = iconCamera();
-
-  const sendBtn = composerEl.querySelector('.btn-icon:last-child');
-  composerEl.insertBefore(camBtn, sendBtn);
-
-  camBtn.addEventListener('click', () => openRecorder(onSendMedia));
+  openRecorder(onSendMedia);
 }
 
 async function openRecorder(onSendMedia) {
@@ -44,11 +35,13 @@ async function openRecorder(onSendMedia) {
   overlay.className = 'video-rec-overlay';
   overlay.innerHTML = `
     <div class="video-rec-wrap">
-      <video class="video-rec-preview" autoplay playsinline muted></video>
-      <div class="video-rec-ring"></div>
+      <div class="video-rec-circle">
+        <video class="video-rec-preview" autoplay playsinline muted></video>
+        <div class="video-rec-ring-anim" style="display:none"></div>
+      </div>
       <div class="video-rec-controls">
-        <button class="btn-icon video-rec-cancel">${iconX()}</button>
-        <button class="video-rec-btn" id="recBtn"></button>
+        <button class="video-rec-cancel">${iconX()}</button>
+        <button class="video-rec-btn"></button>
         <div class="video-rec-timer" style="opacity:0">0:00</div>
       </div>
     </div>
@@ -56,8 +49,9 @@ async function openRecorder(onSendMedia) {
   document.body.appendChild(overlay);
 
   const previewEl = overlay.querySelector('.video-rec-preview');
-  const recBtn = overlay.querySelector('#recBtn');
+  const recBtnEl = overlay.querySelector('.video-rec-btn');
   const timerEl = overlay.querySelector('.video-rec-timer');
+  const ringAnim = overlay.querySelector('.video-rec-ring-anim');
   previewEl.srcObject = stream;
 
   let recorder = null;
@@ -87,7 +81,8 @@ async function openRecorder(onSendMedia) {
     recorder.start(200);
     isRecording = true;
     startTime = Date.now();
-    recBtn.classList.add('recording');
+    recBtnEl.classList.add('recording');
+    ringAnim.style.display = '';
     timerEl.style.opacity = '1';
 
     timerInterval = setInterval(() => {
@@ -101,58 +96,55 @@ async function openRecorder(onSendMedia) {
     if (!isRecording) return;
     isRecording = false;
     clearInterval(timerInterval);
+    recBtnEl.classList.remove('recording');
+    ringAnim.style.display = 'none';
     recorder.stop();
     await new Promise(r => { recorder.onstop = r; });
     durResult = Math.min((Date.now() - startTime) / 1000, MAX_SEC);
-    if (durResult < 0.5) { recBtn.classList.remove('recording'); timerEl.style.opacity = '0'; return; }
+    if (durResult < 0.5) { timerEl.style.opacity = '0'; return; }
 
-    const mimeType = chunks[0]?.type || getSupportedVideoType() || 'video/webm';
-    blobResult = new Blob(chunks, { type: mimeType });
+    const rawMime = chunks[0]?.type || getSupportedVideoType() || 'video/webm';
+    const mime = rawMime.split(';')[0]; // strip codec params for data: URI
+    blobResult = new Blob(chunks, { type: rawMime });
 
-    // Show recorded preview
     const previewUrl = URL.createObjectURL(blobResult);
     previewEl.srcObject = null;
     previewEl.src = previewUrl;
     previewEl.muted = false;
     previewEl.loop = true;
     previewEl.play();
-    recBtn.style.display = 'none';
+    recBtnEl.style.display = 'none';
     timerEl.style.opacity = '0';
 
     const confirmRow = document.createElement('div');
     confirmRow.className = 'video-rec-confirm';
     confirmRow.innerHTML = `
-      <button class="btn btn-danger">Cancel</button>
-      <button class="btn btn-primary">Send</button>
+      <button class="video-rec-action cancel">Cancel</button>
+      <button class="video-rec-action send">Send</button>
     `;
     overlay.querySelector('.video-rec-controls').appendChild(confirmRow);
 
-    confirmRow.querySelector('.btn-danger').onclick = () => { URL.revokeObjectURL(previewUrl); close(); };
-    confirmRow.querySelector('.btn-primary').onclick = async () => {
+    confirmRow.querySelector('.cancel').onclick = () => { URL.revokeObjectURL(previewUrl); close(); };
+    confirmRow.querySelector('.send').onclick = async () => {
       URL.revokeObjectURL(previewUrl);
       close();
-      if (blobResult.size > 2 * 1024 * 1024) {
-        alert('Video too large (max 15s). Try a shorter clip.');
+      if (blobResult.size > 4 * 1024 * 1024) {
+        alert('Video too large. Try a shorter clip.');
         return;
       }
       try {
         const data = await blobToBase64(blobResult);
-        onSendMedia({ t: 'video', data, mime: blobResult.type, dur: Math.round(durResult) });
+        onSendMedia({ t: 'video', data, mime, dur: Math.round(durResult) });
       } catch (e) {
         alert('Failed to encode video: ' + e.message);
       }
     };
   }
 
-  recBtn.addEventListener('click', () => { isRecording ? stopRec() : startRec(); });
+  recBtnEl.addEventListener('click', () => { isRecording ? stopRec() : startRec(); });
   overlay.querySelector('.video-rec-cancel').addEventListener('click', close);
 }
 
-function iconCamera() {
-  return `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M1 5h16v11H1z" rx="2"/><circle cx="9" cy="10.5" r="3"/><path d="M6 5l1.5-3h3L12 5"/>
-  </svg>`;
-}
 function iconX() {
   return `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
     <line x1="4" y1="4" x2="14" y2="14"/><line x1="14" y1="4" x2="4" y2="14"/>
