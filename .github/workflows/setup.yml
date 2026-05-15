@@ -29,13 +29,11 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
-      - name: Install backend deps
-        working-directory: backend
-        run: npm install
-
-      - name: Create admin user
-        working-directory: backend
-        run: node scripts/create-admin.mjs
+      - name: Create admin via Worker
+        run: |
+          curl -s -X POST https://messenger-api.nikita1xbet35.workers.dev/api/setup/init \
+            -H "Content-Type: application/json" \
+            -d "{\"password\":\"$ADMIN_PASSWORD\"}" | tee /tmp/setup-result.json
+          cat /tmp/setup-result.json | grep -q '"ok":true' && echo "✓ Admin created" || (echo "Setup failed or already initialized" && exit 0)
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           ADMIN_PASSWORD: ${{ inputs.admin_password }}

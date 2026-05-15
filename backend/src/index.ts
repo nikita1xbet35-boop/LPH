@@ -6,6 +6,7 @@ import { handleUsers } from './routes/users';
 import { handleConversations } from './routes/conversations';
 import { handleMessages } from './routes/messages';
 import { handleAdmin } from './routes/admin';
+import { handleSetup } from './routes/setup';
 
 export { ChatRoom } from './durable/ChatRoom';
 
@@ -24,7 +25,9 @@ export default {
 
     let response: Response;
 
-    if (path.startsWith('/api/auth/')) {
+    if (path === '/api/setup/init') {
+      response = await handleSetup(request, env);
+    } else if (path.startsWith('/api/auth/')) {
       response = await handleAuth(request, env, path);
     } else if (path.startsWith('/api/admin/')) {
       response = await handleAdmin(request, env, path);
