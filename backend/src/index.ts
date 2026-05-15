@@ -34,8 +34,11 @@ export default {
     } else if (path.startsWith('/api/users')) {
       response = await handleUsers(request, env, path);
     } else if (path.startsWith('/api/conversations') || path.startsWith('/api/messages')) {
-      // Роутим сообщения и разговоры вместе
-      if (path.match(/^\/api\/conversations\/[^/]+\/messages/) || path.startsWith('/api/messages')) {
+      const isConvMessages = path.match(/^\/api\/conversations\/[^/]+\/messages/);
+      // GET сообщений — в handleConversations, POST/DELETE/read — в handleMessages
+      if (isConvMessages && request.method !== 'GET') {
+        response = await handleMessages(request, env, path);
+      } else if (path.startsWith('/api/messages')) {
         response = await handleMessages(request, env, path);
       } else {
         response = await handleConversations(request, env, path);
