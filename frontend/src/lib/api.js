@@ -1,6 +1,6 @@
 import { storage } from './storage.js';
 
-const BASE = '/api';
+const BASE = (import.meta.env.VITE_API_BASE || '') + '/api';
 
 async function request(method, path, body) {
   const token = storage.get('token');
