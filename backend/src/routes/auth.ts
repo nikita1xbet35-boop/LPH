@@ -66,7 +66,7 @@ async function me(request: Request, env: Env): Promise<Response> {
     const ctx = await requireAuth(request, env);
     const { user } = ctx;
     return json({
-      user: { id: user.id, username: user.username, display_name: user.display_name, last_seen: user.last_seen },
+      user: { id: user.id, username: user.username, display_name: user.display_name, last_seen: user.last_seen, public_key: user.public_key },
     }, 200, env, request);
   } catch (e) {
     if (e instanceof AuthError) return err('unauthorized', 'Unauthorized', 401, env, request);

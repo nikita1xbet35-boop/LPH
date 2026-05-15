@@ -60,7 +60,8 @@ export async function renderChat() {
     currentConvId = convId;
     state.activeConvId = convId;
 
-    const conv = state.conversations.find(c => c.id === convId);
+    // Перезагружаем conversations чтобы получить актуальные public_key членов
+    await loadConversations();
 
     // Загружаем сообщения
     try {
