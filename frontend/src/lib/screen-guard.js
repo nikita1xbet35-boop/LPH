@@ -1,5 +1,4 @@
 export function initScreenGuard() {
-  // App-switcher guard: show black screen when app goes to background
   const overlay = document.createElement('div');
   overlay.style.cssText = `
     position: fixed; inset: 0; z-index: 9999;
@@ -19,39 +18,9 @@ export function initScreenGuard() {
   `;
   document.body.appendChild(overlay);
 
+  // Защита превью в переключателе приложений (iOS/Android)
+  // Скрин во время работы приложения заблокировать на вебе невозможно
   document.addEventListener('visibilitychange', () => {
     overlay.style.display = document.hidden ? 'flex' : 'none';
   });
-
-  // iOS PWA canvas trick: a video element playing a canvas stream
-  // appears black in iOS screenshots (hardware video decoder bypass).
-  // We overlay it at near-zero opacity so it's invisible to the eye
-  // but breaks the iOS screenshot compositor for the area below.
-  try {
-    const canvas = document.createElement('canvas');
-    canvas.width = 2; canvas.height = 2;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, 2, 2);
-
-    if (canvas.captureStream) {
-      const stream = canvas.captureStream(1);
-      const video = document.createElement('video');
-      video.srcObject = stream;
-      video.autoplay = true;
-      video.muted = true;
-      video.playsInline = true;
-      video.loop = true;
-      video.style.cssText = `
-        position: fixed; inset: 0; z-index: 9997;
-        width: 100%; height: 100%;
-        object-fit: cover;
-        pointer-events: none;
-        opacity: 0.004;
-        mix-blend-mode: multiply;
-      `;
-      document.body.appendChild(video);
-      video.play().catch(() => {});
-    }
-  } catch {}
 }
