@@ -1,0 +1,64 @@
+name: Setup DB
+
+on:
+  workflow_dispatch:
+    inputs:
+      admin_password:
+        description: 'Password for admin user'
+        required: true
+        type: string
+
+jobs:
+  setup:
+    name: Run migrations + create admin
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm install
+
+      - name: Run migrations
+        working-directory: backend
+        run: npx wrangler d1 execute messenger --remote --file=./migrations/0001_init.sql
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+      - name: Create admin user
+        working-directory: backend
+        run: |
+          node -e "
+          const { createHash, randomBytes } = require('crypto');
+
+          async function main() {
+            const { argon2id } = await import('./node_modules/hash-wasm/dist/index.js');
+            const password = process.env.ADMIN_PASSWORD;
+            const salt = randomBytes(16);
+            const hash = await argon2id({
+              password,
+              salt,
+              iterations: 3,
+              parallelism: 1,
+              memorySize: 19456,
+              hashLength: 32,
+              outputType: 'binary'
+            });
+            const saltB64 = salt.toString('base64');
+            const hashB64 = Buffer.from(hash).toString('base64');
+            const stored = 'argon2id\$' + saltB64 + '\$' + hashB64;
+            const id = randomBytes(16).toString('hex');
+            const now = Math.floor(Date.now() / 1000);
+            const sql = \`INSERT OR IGNORE INTO users (id, username, password_hash, display_name, created_at) VALUES ('\${id}', 'admin', '\${stored}', 'Admin', \${now});\`;
+            process.stdout.write(sql);
+          }
+          main().catch(e => { console.error(e); process.exit(1); });
+          " > /tmp/admin.sql
+          cat /tmp/admin.sql
+          npx wrangler d1 execute messenger --remote --command="$(cat /tmp/admin.sql)"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ADMIN_PASSWORD: ${{ inputs.admin_password }}
