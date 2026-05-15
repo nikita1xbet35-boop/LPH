@@ -402,3 +402,62 @@ th, td {
 th { color: var(--text-2); font-weight: var(--fw-medium); }
 td { color: var(--text-0); }
 .admin-actions { display: flex; gap: var(--sp-2); }
+
+/* ─── Mobile ─── */
+@media (max-width: 768px) {
+  /* Login */
+  .login-card { padding: var(--sp-6) var(--sp-4); }
+
+  /* Chat layout — одна колонка */
+  .chat-layout { position: relative; overflow: hidden; }
+
+  .sidebar {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    z-index: 10;
+    transform: translateX(0);
+    transition: transform var(--t-base);
+  }
+  .sidebar.hidden { transform: translateX(-100%); }
+
+  .chat-main {
+    position: absolute;
+    inset: 0;
+    transform: translateX(100%);
+    transition: transform var(--t-base);
+  }
+  .chat-main.visible { transform: translateX(0); }
+
+  /* Back button в хедере чата */
+  .chat-header {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    padding: var(--sp-3) var(--sp-4);
+  }
+  .chat-header-info { flex: 1; min-width: 0; }
+  .btn-back { display: flex; }
+
+  /* Сообщения — чуть меньше отступы */
+  .message-list { padding: var(--sp-3) var(--sp-3); }
+  .message-bubble { max-width: 85%; }
+  .composer { padding: var(--sp-2) var(--sp-3); }
+
+  /* Сайдбар — футер не режется */
+  .conv-list { padding-bottom: env(safe-area-inset-bottom); }
+  .sidebar-footer { padding-bottom: calc(var(--sp-3) + env(safe-area-inset-bottom)); }
+
+  /* Composer — учитываем safe area */
+  .composer { padding-bottom: calc(var(--sp-2) + env(safe-area-inset-bottom)); }
+
+  /* Модал */
+  .modal { width: calc(100vw - var(--sp-6)); }
+
+  /* Admin */
+  .admin-wrap { padding: var(--sp-4) var(--sp-3); }
+  .admin-create-form { flex-direction: column; }
+  table { font-size: var(--fs-xs); }
+  th, td { padding: var(--sp-1) var(--sp-2); }
+}
+
