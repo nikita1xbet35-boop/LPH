@@ -1,0 +1,21 @@
+name = "messenger-api"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "messenger"
+database_id = "PLACEHOLDER_PUT_REAL_ID_AFTER_CREATE"
+
+[[durable_objects.bindings]]
+name = "CHAT_ROOM"
+class_name = "ChatRoom"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["ChatRoom"]
+
+[vars]
+JWT_SECRET = "REPLACE_WITH_RANDOM_64_CHAR_STRING"
+ADMIN_USERNAME = "admin"

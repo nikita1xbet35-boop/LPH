@@ -1,0 +1,13 @@
+{
+  "name": "messenger-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "deploy": "vite build && wrangler pages deploy dist --project-name messenger-frontend"
+  },
+  "devDependencies": {
+    "vite": "^5.4.11"
+  }
+}
